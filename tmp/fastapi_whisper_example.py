@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 import whisper
 
 # Hugging Face 토큰
-HUGGINGFACE_TOKEN = "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"
+HUGGINGFACE_TOKEN = "huggingface_token"
 
 app = FastAPI()
 
