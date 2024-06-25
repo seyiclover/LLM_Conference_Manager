@@ -45,6 +45,9 @@ async def audio_to_text(audio: UploadFile = File(...)):
         with open(audio_path, "wb") as f:
             f.write(audio_bytes)
 
+        '''
+        # 오디오 로딩시 whisper.load_audio를 사용하면 전처리가 필요하지 않아 whisper.load_audio를 사용하는 것으로 변경했습니다. 
+        
         # 오디오 로딩 및 전처리
         waveform, sample_rate = torchaudio.load(audio_path)
         if sample_rate != 16000:
@@ -52,6 +55,13 @@ async def audio_to_text(audio: UploadFile = File(...)):
 
         # 모델 입력 준비
         inputs = processor(waveform.squeeze(0), sampling_rate=16000, return_tensors="pt")
+        '''
+
+        # 오디오 로딩 및 전처리
+        audio = whisper.load_audio(audio_path)
+
+        # 모델 입력 준비
+        inputs = processor(audio, return_tensors="pt")
 
         # 모델을 사용한 예측
         with torch.no_grad():
