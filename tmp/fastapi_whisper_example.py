@@ -7,6 +7,13 @@
 # numpy.__version__==1.24.3
 # soundfile.__version__==0.12.1
 
+## version of pakage from seyi
+# Python 3.9.12
+# transformers.__version__==4.42.0.dev0
+# torch.__version__==2.3.1+cu121
+# numpy.__version__==1.26.4
+# soundfile.__version__==0.12.1
+
 
 import uvicorn
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
