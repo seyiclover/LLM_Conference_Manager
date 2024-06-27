@@ -12,9 +12,10 @@ import uvicorn
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, AutoTokenizer
 import torch
-import torchaudio
 from fastapi.responses import HTMLResponse
-import whisper
+import numpy as np
+from subprocess import run, CalledProcessError
+import os
 
 # Hugging Face 토큰
 HUGGINGFACE_TOKEN = "huggingface_token"
@@ -35,10 +36,10 @@ def read_root():
             <title>Audio to Text</title>
         </head>
         <body>
-            <h1>Upload audio file</h1>
+            <h1>Upload media file</h1>
             <form action="/audioToText" method="post" enctype="multipart/form-data">
                 Title: <input type="text" name="title"><br>
-                Audio File: <input type="file" name="audio"><br>
+                Media File: <input type="file" name="media"><br>
                 <input type="submit" value="Submit">
             </form>
         </body>
@@ -47,28 +48,40 @@ def read_root():
     return HTMLResponse(content=html_content)
 
 @app.post("/audioToText")
-async def audio_to_text(audio: UploadFile = File(...)):
+async def audio_to_text(media: UploadFile = File(...)):
+
+    temp_input_path = None
+    
     try:
         # 오디오 파일을 임시로 저장
-        audio_bytes = await audio.read()
-        audio_path = "temp_audio.wav"
-        with open(audio_path, "wb") as f:
-            f.write(audio_bytes)
-
-        '''
-        # 오디오 로딩시 whisper.load_audio를 사용하면 전처리가 필요하지 않아 whisper.load_audio를 사용하는 것으로 변경했습니다. 
+        content = await media.read()
+        file_extension = os.path.splitext(media.filename)[1]
+        temp_input_path = f"temp_input{file_extension}"
         
-        # 오디오 로딩 및 전처리
-        waveform, sample_rate = torchaudio.load(audio_path)
-        if sample_rate != 16000:
-            waveform = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=16000)(waveform)
+        with open(temp_input_path, "wb") as f:
+            f.write(content)
 
-        # 모델 입력 준비
-        inputs = processor(waveform.squeeze(0), sampling_rate=16000, return_tensors="pt")
-        '''
+        # FFmpeg 명령어 설정
+        # Whisper input 형태의 오디오로 전처리
+        cmd = [
+            "ffmpeg",
+            "-nostdin",
+            "-threads", "0",
+            "-i", temp_input_path,
+            "-f", "s16le",
+            "-ac", "1",
+            "-acodec", "pcm_s16le",
+            "-ar", "16000",
+            "-"
+        ]
 
-        # 오디오 로딩 및 전처리
-        audio = whisper.load_audio(audio_path)
+        try:
+            out = run(cmd, capture_output=True, check=True).stdout
+        except CalledProcessError as e:
+            raise RuntimeError(f"Failed to load audio: {e.stderr.decode()}") from e
+            
+
+        audio =  np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768.0
 
         # 모델 입력 준비
         inputs = processor(audio, return_tensors="pt")
@@ -87,6 +100,11 @@ async def audio_to_text(audio: UploadFile = File(...)):
     except Exception as e:
         print(f"Error processing audio: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        # 임시 파일 삭제
+        if temp_input_path and os.path.exists(temp_input_path):
+            os.remove(temp_input_path)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=9090)
