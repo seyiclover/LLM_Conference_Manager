@@ -31,8 +31,8 @@ app = FastAPI()
 
 # 모델, 프로세서, 토크나이저를 각각의 저장소에서 로드
 model = AutoModelForSpeechSeq2Seq.from_pretrained("NexoChatFuture/whisper-small-youtube", token=HUGGINGFACE_TOKEN)
-processor = AutoProcessor.from_pretrained("NexoChatFuture/whisper-small-youtube-tokenizer", token=HUGGINGFACE_TOKEN)
-tokenizer = AutoTokenizer.from_pretrained("NexoChatFuture/whisper-small-youtube-processor", token=HUGGINGFACE_TOKEN)
+processor = AutoProcessor.from_pretrained("NexoChatFuture/whisper-small-youtube", token=HUGGINGFACE_TOKEN)
+tokenizer = AutoTokenizer.from_pretrained("NexoChatFuture/whisper-small-youtube", token=HUGGINGFACE_TOKEN)
 
 
 @app.get("/", response_class=HTMLResponse)
