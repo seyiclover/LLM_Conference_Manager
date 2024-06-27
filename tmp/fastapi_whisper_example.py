@@ -1,3 +1,13 @@
+# ffmpeg version 7.0.1 Copyright (c) 2000-2024 the FFmpeg developers
+# uvicorn.__version__==0.30.1
+# fastapi.__version__==0.111.0
+# transformers.__version__==4.41.2
+# torch.__version__==2.3.1
+# whisper.__version__==20231117
+# numpy.__version__==1.24.3
+# soundfile.__version__==0.12.1
+
+
 import uvicorn
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, AutoTokenizer
