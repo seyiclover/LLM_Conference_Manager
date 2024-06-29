@@ -1,3 +1,18 @@
+# uvicorn==0.30.1
+# fastapi==0.111.0
+# transformers==4.42.3
+
+# pytorch==2.3.0
+# pytorch-lightning==2.3.0
+# torch-audiomentations==0.11.1
+# torchaudio==2.3.0
+# torchvision==0.18.0
+
+# numpy==1.24.3
+# soundfile==0.12.1
+# pyannote-audio==3.3.1
+
+
 import uvicorn
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, AutoTokenizer
