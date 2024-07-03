@@ -13,7 +13,7 @@ import subprocess
 app = FastAPI()
 
 # Hugging Face token
-HUGGINGFACE_TOKEN = "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"
+HUGGINGFACE_TOKEN = "HUGGINGFACE_TOKEN"
 
 # Load models
 print("Loading models...")
