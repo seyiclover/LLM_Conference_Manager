@@ -13,15 +13,15 @@ import subprocess
 app = FastAPI()
 
 # Hugging Face token
-HUGGINGFACE_TOKEN = "HUGGINGFACE_TOKEN"
+HUGGINGFACE_TOKEN = "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"
 
-# model load
+# Load models
 model = AutoModelForSpeechSeq2Seq.from_pretrained("NexoChatFuture/whisper-small-youtube-extra", token=HUGGINGFACE_TOKEN)
 processor = AutoProcessor.from_pretrained("NexoChatFuture/whisper-small-youtube-extra", token=HUGGINGFACE_TOKEN)
 tokenizer = AutoTokenizer.from_pretrained("NexoChatFuture/whisper-small-youtube-extra", token=HUGGINGFACE_TOKEN)
 pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization-3.1', use_auth_token=HUGGINGFACE_TOKEN)
 
-# move model to GPU
+# Move model to GPU if available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 pipeline.to(device)
@@ -31,6 +31,7 @@ CHUNK_DURATION = 30  # seconds
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
+    # Serve the HTML form for file upload
     html_content = """
     <html>
         <head>
@@ -51,16 +52,22 @@ def read_root():
 
 @app.post("/diarize-and-transcribe/")
 async def diarize_and_transcribe(media: UploadFile = File(...), num_speakers: int = Form(...)):
+    """
+    Handle file upload, perform speaker diarization and transcription.
+    """
     temp_input_path = None
 
     try:
+        # Read uploaded file
         content = await media.read()
         file_extension = os.path.splitext(media.filename)[1]
         temp_input_path = f"temp_input{file_extension}"
         
+        # Save file temporarily
         with open(temp_input_path, "wb") as f:
             f.write(content)
 
+        # Perform speaker diarization
         result_df = speaker_diarize(temp_input_path, num_speakers)
 
         for index, row in enumerate(result_df.itertuples()):
@@ -73,6 +80,7 @@ async def diarize_and_transcribe(media: UploadFile = File(...), num_speakers: in
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
+        # Delete temporary file
         if temp_input_path and os.path.exists(temp_input_path):
             os.remove(temp_input_path)
 
@@ -94,6 +102,9 @@ def load_audio(path):
     return audio, output_path
 
 def return_transcription(audio_data):
+    """
+    Transcribe the given audio data.
+    """
     audio = np.frombuffer(audio_data.read(), dtype=np.float32)
     total_duration = len(audio) / SR
     transcriptions = []
@@ -112,6 +123,9 @@ def return_transcription(audio_data):
     return ' '.join(transcriptions)
 
 def merge_speaker_rows(df):
+    """
+    Merge consecutive rows with the same speaker.
+    """
     merged_data = []
     current_speaker = None
     current_start = None
@@ -151,12 +165,18 @@ def merge_speaker_rows(df):
     return pd.DataFrame(merged_data)
 
 def rename_speakers(df):
+    """
+    Rename speakers to a user-friendly format.
+    """
     unique_speakers = df['speakers'].unique()
     speaker_map = {speaker: f'참여자 {i+1}' for i, speaker in enumerate(unique_speakers)}
     df['speakers'] = df['speakers'].map(speaker_map)
     return df
 
 def speaker_diarize(path, num_speakers):
+    """
+    Perform speaker diarization on the given audio file.
+    """
     audio, audio_path = load_audio(path)
     speakers = []
     start_timestamp = []
@@ -216,6 +236,3 @@ def speaker_diarize(path, num_speakers):
     final_output_df = rename_speakers(final_output_df)
 
     return final_output_df
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=9090)
