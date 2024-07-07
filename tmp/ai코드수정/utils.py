@@ -56,19 +56,23 @@ def return_transcription(audio_data):
     try:
         audio = np.frombuffer(audio_data.read(), dtype=np.float32)
         total_duration = len(audio) / SR
-        transcriptions = []
+        if total_duration > 0.3: # 오디오 길이 0.3초 넘을 때에만 전사 진행
+            transcriptions = []
+    
+            for start in range(0, int(total_duration), CHUNK_DURATION):
+                end = min(start + CHUNK_DURATION, total_duration)
+                chunk = audio[int(start * SR):int(end * SR)]
+                inputs = processor(chunk, return_tensors="pt", sampling_rate=SR)
+                inputs = inputs.to(device)
+                with torch.no_grad():
+                    predicted_ids = model.generate(inputs.input_features)
+                transcription = tokenizer.batch_decode(predicted_ids, skip_special_tokens=True)[0]
+                transcriptions.append(transcription)
 
-        for start in range(0, int(total_duration), CHUNK_DURATION):
-            end = min(start + CHUNK_DURATION, total_duration)
-            chunk = audio[int(start * SR):int(end * SR)]
-            inputs = processor(chunk, return_tensors="pt", sampling_rate=SR)
-            inputs = inputs.to(device)
-            with torch.no_grad():
-                predicted_ids = model.generate(inputs.input_features)
-            transcription = tokenizer.batch_decode(predicted_ids, skip_special_tokens=True)[0]
-            transcriptions.append(transcription)
-
-        return ' '.join(transcriptions)
+            return ' '.join(transcriptions)
+        else:
+            return None # 오디오 길이 0.3초 이하는 전사 진행하지 않음. 이후 speaker_diarize 함수에서 반환 전에 결측치 제거
+            
     except Exception as e:
         logging.error(f"오류 발생: {e}")
         raise
