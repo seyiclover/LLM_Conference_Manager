@@ -23,6 +23,7 @@ pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization-3.1', use_auth
 # 모델을 GPU로 이동 (가능한 경우)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
+pipeline.to(device)
 
 SR = 16000
 CHUNK_DURATION = 30  # seconds
