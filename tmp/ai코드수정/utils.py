@@ -154,11 +154,12 @@ def speaker_diarize(path, num_speakers):
 
         segments = rename_speakers(segments)
 
-        # transcription 결측치 제거 후 '참여자n: 전사본' 형태로 전환
+        # transcription 결측치 제거 (None, 빈 문자열)
+        # '참여자n: 전사본' 형태로 전환
         formatted_strings = [
             f"{item['speaker']}: {item['transcription']}"
             for item in segments
-            if 'transcription' in item and item['transcription'] is not None
+            if 'transcription' in item and item['transcription'] and item['transcription'].strip()
         ]
 
         # 모든 문자열을 줄바꿈 문자로 연결
