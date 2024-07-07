@@ -149,7 +149,18 @@ def speaker_diarize(path, num_speakers):
             segment['transcription'] = return_transcription(audio_data)
 
         segments = rename_speakers(segments)
-        return segments
+
+        # transcription 결측치 제거 후 '참여자n: 전사본' 형태로 전환
+        formatted_strings = [
+            f"{item['speaker']}: {item['transcription']}"
+            for item in segments
+            if 'transcription' in item and item['transcription'] is not None
+        ]
+
+        # 모든 문자열을 줄바꿈 문자로 연결
+        transcript = "\n".join(formatted_strings)
+        return transcript
+        
     except Exception as e:
         logging.error(f"오류 발생: {e}")
         raise
