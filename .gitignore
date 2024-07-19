@@ -1,0 +1,15 @@
+# macOS 관련 파일
+.DS_Store
+
+# Node.js 관련 파일
+node_modules/
+
+# Python 관련 파일
+__pycache__/
+*.py[cod]
+
+# Log files
+*.log
+
+# 환경 설정 파일
+.env
