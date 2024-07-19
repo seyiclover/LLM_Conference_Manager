@@ -1,8 +1,6 @@
 # LLM Conference Manager
 고용노동부-대한상공회의소 주관 미래내일 일경험 프로젝트
 
-### 넥소챗
-
 ![Nexo_logo2_name](https://github.com/user-attachments/assets/a87d7a88-9629-4ae7-895b-3b2f07322fa3)
 
 
