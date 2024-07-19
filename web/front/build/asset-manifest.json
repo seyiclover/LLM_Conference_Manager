@@ -1,0 +1,21 @@
+{
+  "files": {
+    "main.css": "/static/css/main.a602c452.css",
+    "main.js": "/static/js/main.a504d769.js",
+    "static/js/453.9c8709a5.chunk.js": "/static/js/453.9c8709a5.chunk.js",
+    "static/media/circle.png": "/static/media/circle.6d42b720949594ffa32c.png",
+    "static/media/robot.png": "/static/media/robot.cd5796bebbc2179ee913.png",
+    "static/media/clova.png": "/static/media/clova.70dbe754a7d8c85aaf10.png",
+    "static/media/Nexo_logo_small.png": "/static/media/Nexo_logo_small.62edde52cb9c9d066a6f.png",
+    "static/media/nexochat.png": "/static/media/nexochat.62edde52cb9c9d066a6f.png",
+    "static/media/notion.png": "/static/media/notion.4cbc4396aeee8d072451.png",
+    "index.html": "/index.html",
+    "main.a602c452.css.map": "/static/css/main.a602c452.css.map",
+    "main.a504d769.js.map": "/static/js/main.a504d769.js.map",
+    "453.9c8709a5.chunk.js.map": "/static/js/453.9c8709a5.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.a602c452.css",
+    "static/js/main.a504d769.js"
+  ]
+}
