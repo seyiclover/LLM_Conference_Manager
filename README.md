@@ -8,9 +8,10 @@
 
 
 ### 프로젝트 소개
+NexoChat:LLM을 활용한 사용자 컨텐츠 기반의 컨퍼런스 매니저 
 
-
-
+초거대 언어모델 LLM 을 활용한 사용자 맞춤형 기록 시스템 
+장기간 누적된 회의 데이터에 대해 챗봇 형식으로 검색 및 질의응답
 
 ### 개발 인원 및 기간
 
@@ -22,7 +23,9 @@
 ### 적용 기술
 
 - Front-End : React, styled-components, html, javascript
-- Back-End : Python, FastApi, Alembic,SQL Alchemy(orm), MySQLcommon : Git, Github
+- Back-End : Python, FastApi, Alembic,SQL Alchemy(orm), MySQL
+- common : Git, Github
+- AI : python,
 
 ### 구현 기능
 
