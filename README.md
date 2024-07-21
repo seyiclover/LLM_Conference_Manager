@@ -55,7 +55,24 @@ NexoChat은 초거대 언어모델(LLM)을 활용하여 사용자 맞춤형 기�
 4. **데이터 처리**: 파일 업로드 처리, AI 모델을 통한 텍스트 유사도 분석 및 응답 생성
 
 ## AI 기능 구현 
+<img width="749" alt="image" src="https://github.com/user-attachments/assets/4441aa48-f95a-42ac-9194-4dad65f93758">
 
+### 1. STT 
+- 한국어 대용량 데이터셋으로 학습된 pretrained whisper small 모델을 자체 구축 데이터셋으로 파인튜닝하여 사용
+- base model: SungBeom/whisper-small-ko
+  https://huggingface.co/SungBeom/whisper-small-ko#training-hyperparameters
+- 파인튜닝 사용 데이터셋
+  <img width="626" alt="image" src="https://github.com/user-attachments/assets/083bec6d-7008-4d7a-9160-adb5abcb2805">
+- 파인튜닝 학습 성능
+  ### Training results
+| Training Loss | Epoch  | Step  | Cer     | Validation Loss | Wer     |
+|:-------------:|:------:|:-----:|:-------:|:---------------:|:-------:|
+| 0.3849        | 5.5617 | 10000 |  9.9827 | 0.3555          | 25.0944 |
+  <img width="786" alt="image" src="https://github.com/user-attachments/assets/4b6d38ab-deab-4401-b6d5-9854bd2ab1f1">
+
+ 
+### 2. 화자 분리  
+### 3. 챗봇
 
 
 # 시연
