@@ -64,20 +64,48 @@ NexoChat은 초거대 언어모델(LLM)을 활용하여 사용자 맞춤형 기�
   https://huggingface.co/SungBeom/whisper-small-ko#training-hyperparameters
   
 - 파인튜닝 사용 데이터셋
+  
   <img width="626" alt="image" src="https://github.com/user-attachments/assets/083bec6d-7008-4d7a-9160-adb5abcb2805">
+  
 - 파인튜닝 학습 성능
-  ### Training results
-| Training Loss | Epoch  | Step  | Cer     | Validation Loss | Wer     |
-|:-------------:|:------:|:-----:|:-------:|:---------------:|:-------:|
-| 0.3849        | 5.5617 | 10000 |  9.9827 | 0.3555          | 25.0944 |
+  
+    | Training Loss | Epoch  | Step  | Cer     | Validation Loss | Wer     |
+    |:-------------:|:------:|:-----:|:-------:|:---------------:|:-------:|
+    | 0.3849        | 5.5617 | 10000 |  9.9827 | 0.3555          | 25.0944 |
   <img width="786" alt="image" src="https://github.com/user-attachments/assets/4b6d38ab-deab-4401-b6d5-9854bd2ab1f1">
 
+#### Python Usage
+```python
+from transformers import WhisperForConditionalGeneration, WhisperProcessor, WhisperFeatureExtractor, WhisperTokenizer
+
+model = WhisperForConditionalGeneration.from_pretrained("NexoChatFuture/whisper-small-youtube-extra")
+feature_extractor = WhisperFeatureExtractor.from_pretrained("NexoChatFuture/whisper-small-youtube-extra")
+tokenizer = WhisperTokenizer.from_pretrained("NexoChatFuture/whisper-small-youtube-extra-tokenizer")
+processor = WhisperProcessor.from_pretrained("NexoChatFuture/whisper-small-youtube-extra-processor")
+
+```
  
 ### 2. 화자 분리  
+- pyannote speaker diarization 오픈 소스 모델 사용
+  
+  https://github.com/pyannote/pyannote-audio
+
 ### 3. 챗봇
+- Naver HyperCLOVA X api 사용 챗봇 기능 구현
+- 핵심 기능
+  1) 회의록 요약
+  2) 회의 데이터 기반 검색 및 질의응답 
+
+## 웹 페이지 화면 
+<table>
+  <tr>
+    <td><img width="752" height="270" alt="image" src="https://github.com/user-attachments/assets/5268fa56-1c56-4792-92f1-af7c5804ec3f"></td>
+    <td><img width="752" height="270" alt="image" src="https://github.com/user-attachments/assets/21d89188-4d97-4466-a6db-d71b4242c1f1"></td>
+  </tr>
+</table>
 
 
-# 시연
+## 시연
 
 ### 데모 영상
 
