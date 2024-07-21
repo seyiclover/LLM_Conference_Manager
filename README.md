@@ -89,8 +89,10 @@ processor = WhisperProcessor.from_pretrained("NexoChatFuture/whisper-small-youtu
 ### 3. 챗봇
 - Naver HyperCLOVA X api 사용 챗봇 기능 구현
 - 핵심 기능
-  1) 회의록 요약
-  2) 회의 데이터 기반 검색 및 질의응답 
+  
+  1\) 회의록 요약
+  
+  2\) 회의 데이터 기반 검색 및 질의응답 
 
 ## 웹 페이지 화면 
 <table>
