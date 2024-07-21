@@ -59,9 +59,7 @@ NexoChat은 초거대 언어모델(LLM)을 활용하여 사용자 맞춤형 기�
 
 ### 1. STT 
 - 한국어 대용량 데이터셋으로 학습된 pretrained whisper small 모델을 자체 구축 데이터셋으로 파인튜닝하여 사용
-- base model: SungBeom/whisper-small-ko
-  
-  https://huggingface.co/SungBeom/whisper-small-ko#training-hyperparameters
+- base model: [SungBeom/whisper-small-ko](https://huggingface.co/SungBeom/whisper-small-ko#training-hyperparameters)
   
 - 파인튜닝 사용 데이터셋
   
@@ -86,9 +84,7 @@ processor = WhisperProcessor.from_pretrained("NexoChatFuture/whisper-small-youtu
 ```
  
 ### 2. 화자 분리  
-- pyannote speaker diarization 오픈 소스 모델 사용
-  
-  https://github.com/pyannote/pyannote-audio
+- [pyannote speaker diarization](https://github.com/pyannote/pyannote-audio) 오픈 소스 모델 사용
 
 ### 3. 챗봇
 - Naver HyperCLOVA X api 사용 챗봇 기능 구현
