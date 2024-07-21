@@ -25,6 +25,8 @@ NexoChat은 초거대 언어모델(LLM)을 활용하여 사용자 맞춤형 기�
 
 ## 시스템 구조
 
+<img width="712" alt="image" src="https://github.com/user-attachments/assets/9ec1022d-dd71-45f5-b05f-a4d483f0ba28">
+
 
 ### 기술 스택
 - **프론트엔드**: React
