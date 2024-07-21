@@ -32,7 +32,8 @@ NexoChat은 초거대 언어모델(LLM)을 활용하여 사용자 맞춤형 기�
 - **프론트엔드**: React
 - **백엔드**: FastAPI, MySQL, SQLAlchemy, Alembic
 - **디자인**: Figma
-- **AI 모델**: OpenAI Whisper, Pytorch, Pyannote, HyperCLOVA X
+- **AI**: Python, Huggingface, Pytorch
+- **사용모델**: OpenAI Whisper, Pyannote, HyperCLOVA X api
 
 ## 프론트엔드 및 백엔드 구현
 
@@ -53,6 +54,7 @@ NexoChat은 초거대 언어모델(LLM)을 활용하여 사용자 맞춤형 기�
 3. **음성 파일 업로드 및 처리**: 화자 분리, 음성 -> 텍스트 변환
 4. **데이터 처리**: 파일 업로드 처리, AI 모델을 통한 텍스트 유사도 분석 및 응답 생성
 
+## AI 기능 구현 
 
 
 
