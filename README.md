@@ -60,7 +60,9 @@ NexoChat은 초거대 언어모델(LLM)을 활용하여 사용자 맞춤형 기�
 ### 1. STT 
 - 한국어 대용량 데이터셋으로 학습된 pretrained whisper small 모델을 자체 구축 데이터셋으로 파인튜닝하여 사용
 - base model: SungBeom/whisper-small-ko
+  
   https://huggingface.co/SungBeom/whisper-small-ko#training-hyperparameters
+  
 - 파인튜닝 사용 데이터셋
   <img width="626" alt="image" src="https://github.com/user-attachments/assets/083bec6d-7008-4d7a-9160-adb5abcb2805">
 - 파인튜닝 학습 성능
