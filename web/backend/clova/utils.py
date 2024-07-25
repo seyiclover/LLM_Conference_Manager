@@ -5,9 +5,6 @@ import logging
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
-from konlpy.tag import Kkma  # 형태소 분석기 불러오기
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 from urllib.parse import urlparse
 from fastapi import HTTPException
 from http import HTTPStatus
@@ -30,8 +27,6 @@ host = parsed_url.hostname
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
 
 class STT_CompletionExecutor:
     def __init__(self, host, api_key, api_key_primary_val, request_sum):
@@ -61,7 +56,6 @@ class STT_CompletionExecutor:
         else:
             logger.error(f"Error in summarization API: {res}")
             raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail='Summarization API error')
-
 
 class CLOVAStudioExecutor:
     def __init__(self, host, api_key, api_key_primary_val):
@@ -103,6 +97,30 @@ class SummarizationExecutor(CLOVAStudioExecutor):
         res, status = self._send_request(completion_request, endpoint, request_id)
         if status == HTTPStatus.OK and "result" in res:
             return res["result"]["text"]
+        else:
+            error_message = res.get("status", {}).get("message", "Unknown error") if isinstance(res, dict) else "Unknown error"
+            raise ValueError(f"Error: HTTP {status}, message: {error_message}")
+
+class SegmentationExecutor(CLOVAStudioExecutor):
+    def __init__(self, host, api_key, api_key_primary_val):
+        super().__init__(host, api_key, api_key_primary_val)
+
+    def execute(self, completion_request, endpoint='/testapp/v1/api-tools/segmentation/c579867d7bd84cb1a53f6127beae3805', request_id=None):
+        res, status = self._send_request(completion_request, endpoint, request_id)
+        if status == HTTPStatus.OK and "result" in res:
+            return res["result"]['topicSeg']
+        else:
+            error_message = res.get("status", {}).get("message", "Unknown error") if isinstance(res, dict) else "Unknown error"
+            raise ValueError(f"Error: HTTP {status}, message: {error_message}")
+
+class EmbeddingExecutor(CLOVAStudioExecutor):
+    def __init__(self, host, api_key, api_key_primary_val):
+        super().__init__(host, api_key, api_key_primary_val)
+
+    def execute(self, completion_request, endpoint='/testapp/v1/api-tools/embedding/clir-emb-dolphin/642db2c971e6452882c1a8421821866c', request_id=None):
+        res, status = self._send_request(completion_request, endpoint, request_id)
+        if status == HTTPStatus.OK and "result" in res:
+            return res["result"]["embedding"]
         else:
             error_message = res.get("status", {}).get("message", "Unknown error") if isinstance(res, dict) else "Unknown error"
             raise ValueError(f"Error: HTTP {status}, message: {error_message}")

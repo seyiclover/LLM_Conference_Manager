@@ -32,8 +32,8 @@ app = FastAPI(lifespan=lifespan)
 # 서버 시작 메시지
 print("welcome server on")
 
-static_dir = "/mnt/a/front/chatbot/build/static"
-index_file_path = "/mnt/a/front/chatbot/build/index.html"
+static_dir = "/Users/jhpark/Documents/study/ai/projects/nexochat/embedding_rag/LLM_Conference_Manager/web/front/build/static"
+index_file_path = "/Users/jhpark/Documents/study/ai/projects/nexochat/embedding_rag/LLM_Conference_Manager/web/front/build/index.html"
 
 # 정적 파일 제공 설정
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
