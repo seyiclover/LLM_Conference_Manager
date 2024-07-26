@@ -88,32 +88,29 @@ user_session_states: Dict[int, Dict[str, Any]] = {}
 
 def get_session_state(user_id: int):
 
-    prompt = "너는 사용자가 <회의에 대해 질문할 때>와 사용자가 <회의와 관련 없는 질문할 때> 를 구분하고, 다르게 행동하는 유능하한 비서야. \n\
+    prompt = "너는 사용자가 <회의에 대해 질문할 때>와 사용자가 <회의와 관련 없는 질문할 때> 를 구분하고, 다르게 행동하는 유능한 비서야. \n\
                         - 답변은 친절하게, 한 줄로 짧게 해. 내용을 모두 전달한 후에는 {추가로 궁금한 점이 있으시면 말씀해 주세요.}라고 말해. \n\
-                        1. 사용자가 회의에 대해 질문하면, 네가 가지고있는 지식은 모두 배제하고, ## 회의 데이터 ## 만을 바탕으로 답변해. ## 회의 데이터 ## 는 사용자가 진행했던 회의 데이터야. \n\
+                        1. 사용자가 회의에 대해 질문하면, 네가 가지고있는 지식은 모두 배제하고, ## 회의 데이터 ## 만을 바탕으로 답변해. ## 회의 데이터 ## 는 사용자가 진행했던 회의 데이터야. 회의 일부는 사용자의 질문과 관련 있는 회의록의 한 부분이야. \n\
                         2. 사용자가 회의에 대해 질문한 게 아니라면, 반드시 ## 회의 데이터 ## 를 무시하고, 네가 가지고 있는 지식으로 친절하게 답해. \n\
                         3. 사용자가 기존에 질문한 회의에 대한 추가 질문을 하면, 해당하는 과거 질문의 ## 회의 데이터 ## 를 바탕으로 답변해. \n\
-                            유능한 비서의 답변 ## 예시 ## 를 참고해. \n\
+                            유능한 비서의 답변 ## 예시 ## 처럼 답해. \n\
                             ## 예시 ## \n\
-                            - 질문1:  서울시 여성 아동 외국인 회의 날짜가 언제였지? \n\
-                            - 답변1: 2018년 11월 6일에 서울시 여성 아동 외국인 관련 시설 소관사항에 대한 2018년도 행정사무감사 실시를 선언한 회의가 진행되었습니다. \n\
-                            - 질문2: 회의에서 논의된 예산 관련 사항은 무엇인가요? \n\
-                            - 답변2: 해당 회의에서 논의된 예산 관련 사항은 다음과 같습니다.\n\n- 영유아를 양육하는 아버지에게 강의형 또는 체험형의 교육을 진행하는 사업의 예산은 9997만 4000원이며, 이 중 8506만 원을 집행함 \n\
-                            - 질문3: 회의에서 나온 주요 이슈는 무엇인가요? \n\
-                            - 답변3: 회의에서 나온 주요 이슈는 다음과 같습니다.\n\n 1. 서울여성공익센터와 서울여성공익센터 아리움의 주요 업무보고\n2. 서울시 육아종합지원센터의 역할과 노력\n3. 영유아를 양육하는 아버지에게 강의형 또는 체험형 교육을 진행하는 사업의 성과와 예산 집행 내역 \n\ "
+                            - 사용자:  서울시 여성 아동 외국인 회의 날짜가 언제였지? \n\
+                            - 비서: 2018년 11월 6일에 서울시 여성 아동 외국인 관련 시설 소관사항에 대한 2018년도 행정사무감사 실시를 선언한 회의가 진행되었습니다. \n\
+                            - 사용자: 회의에서 논의된 예산 관련 사항은 무엇인가요? \n\
+                            - 비서: 해당 회의에서 논의된 예산 관련 사항은 다음과 같습니다.\n\n- 영유아를 양육하는 아버지에게 강의형 또는 체험형의 교육을 진행하는 사업의 예산은 9997만 4000원이며, 이 중 8506만 원을 집행함 \n\
+                            - 사용자: 회의에서 나온 주요 이슈는 무엇인가요? \n\
+                            - 비서: 회의에서 나온 주요 이슈는 다음과 같습니다.\n\n 1. 서울여성공익센터와 서울여성공익센터 아리움의 주요 업무보고\n2. 서울시 육아종합지원센터의 역할과 노력\n3. 영유아를 양육하는 아버지에게 강의형 또는 체험형 교육을 진행하는 사업의 성과와 예산 집행 내역 \n\ "
 
-
+    # 토큰 수 계산이 다르게 되는 것 같아서 삭제
+    # chat_log, last_response, previous_messages 사용하지 않는데 헷갈려서 삭제
     if user_id not in user_session_states:
         user_session_states[user_id] = {
             "preset_messages": [{"role": "system", "content": prompt}],
-            "total_tokens": 0,
-            "chat_log": [],
             "summary_messages": [],
             "last_user_input": "",
-            "last_response": "",
             "last_user_message": {},
             "last_assistant_message": {},
-            "previous_messages": [],
             "system_message": prompt
         }
     return user_session_states[user_id]
@@ -122,7 +119,6 @@ def log_preset_messages(user_id: int):
     session_state = get_session_state(user_id)
     print(f"User {user_id} preset_messages:", json.dumps(session_state['preset_messages'], ensure_ascii=False, indent=2))
     print(f"User {user_id} system_message:", session_state['system_message'])
-    print(f"User {user_id} total_tokens:", session_state['total_tokens'])
 
 def summarize_and_reset(user_id: int, summarization_executor):
     session_state = get_session_state(user_id)
@@ -153,16 +149,15 @@ def summarize_and_reset(user_id: int, summarization_executor):
         session_state['summary_messages'].append({"role": "system", "content": summary_text})
 
         session_state['preset_messages'] = [{"role": "system", "content": session_state['system_message']}, {"role": "system", "content": summary_text}]
-        
-        session_state['preset_messages'].append(session_state.get('last_user_message', {}))
-        session_state['preset_messages'].append(session_state.get('last_assistant_message', {}))
 
-        session_state['total_tokens'] = len(summary_text.split()) + \
-            len(session_state.get('last_user_message', {}).get('content', '').split()) + \
-            len(session_state.get('last_assistant_message', {}).get('content', '').split())
-        
+    # assistant message 가 생성되기 전 & 관련 회의 데이터 생성되기 전, user message 만 보낸 상태에서 max token 오류 발생함
+    # 그러므로 벡터 검색 -> 관련 회의 데이터 생성을 위해 마지막 사용자 질문 반환 
+    last_user_message = session_state.get('last_user_message', {}).get('content', '')
 
-    log_preset_messages(user_id)
+    return last_user_message
+
+ 
+        
 
 # Connect to Milvus
 connect_to_milvus()
@@ -204,7 +199,7 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
         data=[query_vector],  # 검색할 벡터 데이터
         anns_field="embedding",  # 검색을 수행할 벡터 필드 지정
         param=search_params,
-        limit=5, # 관련도가 가장 높은 5개의 데이터 반환
+        limit=3, # 관련도가 가장 높은 3개의 데이터 반환
         output_fields=["title", "date", "num_speakers", "text"]
     )
     
@@ -224,7 +219,6 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
         })
     
     session_state['preset_messages'].append(session_state['last_user_message'])
-    session_state['chat_log'].append(session_state['last_user_message'])
 
     request_data = {
         "messages": session_state['preset_messages'],
@@ -250,41 +244,15 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
         )
     
     try:
-
         response = await asyncio.to_thread(completion_executor.execute, request_data, request_id=request_chat)
         response_text = response['result']['message']['content']
     
-        session_state['last_response'] = response_text
         session_state['last_assistant_message'] = {"role": "assistant", "content": response_text}
-
         session_state['preset_messages'].append(session_state['last_assistant_message'])
-        session_state['chat_log'].append(session_state['last_assistant_message'])
 
-        # 토큰 수 계산
-        session_state['total_tokens'] = len(" ".join(msg['content'] for msg in session_state['preset_messages']).split())
 
         log_preset_messages(user_id)
 
-        # 대화 생성 후 max token 제한 초과하는 경우, 지금까지의 대화 요약함
-        token_limit = 4096 - request_data["maxTokens"]
-        if session_state['total_tokens'] > token_limit:
-            print(f"Token limit exceeded for user {user_id}. Starting summarization.")
-            summarize_and_reset(user_id, summarization_executor)
-
-            # 여기서 request_data를 다시 생성 또는 업데이트
-            request_data = {
-                "messages": session_state['preset_messages'],
-                "maxTokens": 256,
-                "temperature": 0.5,
-                "topK": 0,
-                "topP": 0.6,
-                "repeatPenalty": 1.2,
-                "stopBefore": [],
-                "includeAiFilters": True,
-                "seed": 0,
-            }
-            response = await asyncio.to_thread(completion_executor.execute, request_data, request_id=request_chat)
-            response_text = response['result']['message']['content']
 
     except Exception as e:
         response_text = "죄송합니다. 채팅 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
@@ -292,11 +260,34 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
         # 대화 생성 중 max token 제한 초과하는 경우 오류 발생 -> 지금까지의 대화 요약
         try: 
             print(f"Error occured during chat for user {user_id}. Starting summarization.")
-            summarize_and_reset(user_id, summarization_executor)
 
-            session_state['preset_messages'].append(session_state['last_user_message']) # user 질문 추가 
+            # 반환된 마지막 사용자 질문 바탕으로 벡터 검색 수행
+            last_user_question = summarize_and_reset(user_id, summarization_executor)
+            query_vector = query_embed(last_user_question)
 
-            # 여기서 request_data를 다시 생성 또는 업데이트
+            search_params = {"metric_type": "IP", "params": {"ef": 64}}
+            results = collection.search(
+                data=[query_vector],  # 검색할 벡터 데이터
+                anns_field="embedding",  # 검색을 수행할 벡터 필드 지정
+                param=search_params,
+                limit=3, # 관련도가 가장 높은 3개의 데이터 반환
+                output_fields=["title", "date", "num_speakers", "text"]
+            )
+
+            for hit in results[0]:
+                title = hit.entity.get("title")
+                date = hit.entity.get("date")
+                num_speakers = hit.entity.get("num_speakers")
+                text = hit.entity.get("text")
+                session_state['preset_messages'].append({
+                    "role": "system",
+                    "content": f"## 회의 데이터 ## \n- 회의 제목: {title}\n - 회의 날짜: {date}\n - 회의 참석자 수: {num_speakers}\n - 회의 일부: {text}\n"
+                })
+
+            # 사용자 질문이 마지막에 와야 하므로 추가
+            session_state['preset_messages'].append(session_state['last_user_message'])
+
+            # request_data를 다시 생성 또는 업데이트
             request_data = {
                 "messages": session_state['preset_messages'],
                 "maxTokens": 256,
@@ -309,8 +300,18 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
                 "seed": 0,
             }
 
+            log_preset_messages(user_id)
+
             response = await asyncio.to_thread(completion_executor.execute, request_data, request_id=request_chat)
             response_text = response['result']['message']['content']
+
+            # 마지막 사용자 질문이 들어간 request_data 챗봇에게 전달 
+            # -> max token 오류 발생
+            # -> summarize_and_reset에서 요약 + 마지막 사용자 질문 preset_message 에 추가
+            # -> response_text 다시 생성
+            # -> 다시 생성된 response_text에서 챗봇 답변 추출해서 last_assistant_message, preset_message에 추가
+            session_state['last_assistant_message'] = {"role": "assistant", "content": response_text}
+            session_state['preset_messages'].append(session_state['last_assistant_message'])
             
         # max token 외 다른 오류 발생시
         except Exception as e:
