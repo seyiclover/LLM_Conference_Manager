@@ -23,12 +23,11 @@ def connect_to_milvus():
         logging.error(f"Error connecting to Milvus: {e}")
         raise
 
-
 # 컬렉션 확인 및 생성 함수
 def check_and_create_collection(collection_name):
     if utility.has_collection(collection_name):
         collection = Collection(collection_name)
-        utility.load_state(collection_name)
+        print('Collection exists')
 
     else:
         fields = [
@@ -50,5 +49,12 @@ def check_and_create_collection(collection_name):
         }
         collection.create_index(field_name="embedding", index_params=index_params)
 
+        print('Created collection')
+
+    collection.load()
 
     return collection
+
+# Milvus 컬렉션을 가져오는 의존성 함수
+def get_milvus_collection() -> Collection:
+    return check_and_create_collection("meeting_data")

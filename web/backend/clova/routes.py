@@ -14,7 +14,7 @@ import asyncio
 
 # milvus db
 from pymilvus import Collection
-from common.milvus import connect_to_milvus
+from common.milvus import connect_to_milvus, get_milvus_collection
 
 # .env 파일에서 환경 변수 로드
 load_dotenv(dotenv_path='../.env')
@@ -31,8 +31,12 @@ api_key = os.getenv("API_KEY")
 api_key_primary_val = os.getenv("API_KEY_PRIMARY_VAL")
 request_sum = os.getenv("REQUEST_SUM")
 request_chat = os.getenv("REQUEST_CHAT")
-request_emb = os.getenv("REQUEST_EMB")
 request_seg = os.getenv("REQUEST_SEG")
+
+# 오픈소스 임베딩 api
+request_emb_v2 = os.getenv("REQUEST_EMB_V2")
+api_key_v2 = os.getenv("API_KEY_V2")
+api_key_primary_val_v2 = os.getenv("API_KEY_PRIMARY_VAL_V2")
 
 
 # 호스트 추출
@@ -159,28 +163,23 @@ def summarize_and_reset(user_id: int, summarization_executor):
 # Connect to Milvus
 connect_to_milvus()
 
-milvus_collection_name = 'meeting_data'
-
-collection = Collection(milvus_collection_name)
-collection.load()
-
 # Initialize EmbeddingExecutor
 embedding_executor = EmbeddingExecutor(
         host=host,
-        api_key=api_key,
-        api_key_primary_val=api_key_primary_val
+        api_key_v2=api_key_v2,
+        api_key_primary_val_v2=api_key_primary_val_v2
     )
 
 # 사용자의 질문 임베딩하는 함수
 def query_embed(text: str):
     request_data = {"text": text}
-    response_data = embedding_executor.execute(request_data, request_id=request_emb)
+    response_data = embedding_executor.execute(request_data, request_id=request_emb_v2)
     return response_data
 
 # 벡터 검색 후 결과 저장
 # reference로 제공할 회의 데이터
 # 유사도 거리는 챗봇에게 제공 안함
-def vector_search(session_state, query_vector):
+def vector_search(session_state, query_vector, collection):
     search_params = {"metric_type": "IP", "params": {"ef": 64}}
     results = collection.search(
         data=[query_vector],  # 검색할 벡터 데이터
@@ -203,7 +202,7 @@ def vector_search(session_state, query_vector):
 
 # 비동기 처리된 챗봇 엔드포인트
 @router.post("/chat")
-async def chat(question: Question, current_user: UserModel = Depends(get_current_user)):
+async def chat(question: Question, current_user: UserModel = Depends(get_current_user), collection: Collection = Depends(get_milvus_collection)):
 
     user_id = current_user.id
     session_state = get_session_state(user_id)
@@ -213,7 +212,7 @@ async def chat(question: Question, current_user: UserModel = Depends(get_current
     query_vector = query_embed(user_question)
 
     # 벡터 검색 후 preset_messages에 결과 저장
-    vector_search(session_state, query_vector)
+    vector_search(session_state, query_vector, collection)
     
     session_state['last_user_input'] = user_question
     session_state['last_user_message'] = {"role": "user", "content": user_question}
@@ -262,7 +261,7 @@ async def chat(question: Question, current_user: UserModel = Depends(get_current
             # 반환된 마지막 사용자 질문 바탕으로 벡터 검색 수행
             last_user_question = summarize_and_reset(user_id, summarization_executor)
             query_vector = query_embed(last_user_question)
-            vector_search(session_state, query_vector)
+            vector_search(session_state, query_vector, collection)
 
             # preset_messages에 사용자 질문이 마지막에 와야 하므로 추가
             session_state['preset_messages'].append(session_state['last_user_message'])

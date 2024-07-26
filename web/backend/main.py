@@ -13,6 +13,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
+# milvus
+from common.milvus import connect_to_milvus, check_and_create_collection
 
 from common.models import init_db
 from backend.auth.routes import router as auth_router
@@ -21,10 +23,12 @@ from backend.upload.routes import router as upload_router
 from backend.clova.routes import router as clova_router
 import uvicorn
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    connect_to_milvus()  # Milvus DB 연결
+    check_and_create_collection("meeting_data")  # 컬렉션 확인 및 생성
+
     yield
 
 app = FastAPI(lifespan=lifespan)

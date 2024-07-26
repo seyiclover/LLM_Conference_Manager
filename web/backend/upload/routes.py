@@ -10,12 +10,14 @@ from backend.auth.routes import get_current_user
 from backend.upload.utils import speaker_diarize
 
 # milvus
+from pymilvus import utility
 from common.milvus import connect_to_milvus, check_and_create_collection
 from langchain_core.documents.base import Document
 from clova.utils import SegmentationExecutor, EmbeddingExecutor
 import json
 import time
 from urllib.parse import urlparse
+import numpy as np
 
 router = APIRouter()
 
@@ -25,8 +27,12 @@ api_key = os.getenv("API_KEY")
 api_key_primary_val = os.getenv("API_KEY_PRIMARY_VAL")
 request_sum = os.getenv("REQUEST_SUM")
 request_chat = os.getenv("REQUEST_CHAT")
-request_emb = os.getenv("REQUEST_EMB")
 request_seg = os.getenv("REQUEST_SEG")
+
+# 오픈소스 임베딩 api
+api_key_v2 = os.getenv("API_KEY_V2")
+api_key_primary_val_v2 = os.getenv("API_KEY_PRIMARY_VAL_V2")
+request_emb_v2 = os.getenv("REQUEST_EMB_V2")
 
 # 호스트 추출
 parsed_url = urlparse(host_url)
@@ -244,7 +250,8 @@ def process_and_embed_transcript(transcript: TranscriptModel):
                 "title": data.metadata["title"],
                 "date": data.metadata["date"],
                 "num_speakers": data.metadata["num_speakers"],
-                "text": paragraph
+                "text": paragraph,
+                "full": data.page_content # 전체 텍스트도 저장
             }
             chunked_data.append(chunked_document)
     
@@ -252,6 +259,7 @@ def process_and_embed_transcript(transcript: TranscriptModel):
     
     # milvus db 연결
     connect_to_milvus()
+
     collection = check_and_create_collection('meeting_data')
 
     ######################################################
@@ -263,11 +271,11 @@ def process_and_embed_transcript(transcript: TranscriptModel):
     RETRY_DELAY = 60  # 초
     MAX_RETRIES = 5
 
-    # 임베딩 api
+    # 오픈소스 임베딩 api
     embedding_executor = EmbeddingExecutor(
             host=host,
-            api_key=api_key,
-            api_key_primary_val=api_key_primary_val
+            api_key_v2=api_key_v2,
+            api_key_primary_val_v2=api_key_primary_val_v2
         )
 
     # 임베딩 벡터 차원 저장
@@ -283,17 +291,47 @@ def process_and_embed_transcript(transcript: TranscriptModel):
 
         for attempt in range(MAX_RETRIES):
             try:
-                # 회의 메타데이터 + 텍스트 임베딩
-                request_json_string = json.dumps({
-                    "text": f"회의 제목: {data['title']}, 회의 날짜: {data['date']}, 회의 참석자 수: {data['num_speakers']}, 회의 내용: {data['text']}" 
+                # 회의 메타데이터
+                request_string_metadata = json.dumps({
+                    "text": f"회의 제목: {data['title']}, 회의 날짜: {data['date']}, 회의 참석자 수: {data['num_speakers']}" 
                 }, ensure_ascii=False)
 
-                request_data = json.loads(request_json_string, strict=False)
-                print(request_data)
-                embedding = embedding_executor.execute(request_data, request_id=request_emb) # 임베딩 실행
+                request_data_string = json.loads(request_string_metadata, strict=False)
+                embedding_metadata = embedding_executor.execute(request_data_string, request_id=request_emb_v2) 
 
-                data["embedding"] = embedding 
+                # 문단 텍스트
+                request_string_text = json.dumps({
+                    "text": f"{data['text']}" 
+                }, ensure_ascii=False)
 
+                request_data_text = json.loads(request_string_text, strict=False)
+                embedding_text = embedding_executor.execute(request_data_text, request_id=request_emb_v2) 
+
+                # 전체 텍스트
+                request_string_full = json.dumps({
+                    "text": f"{data['full']}" 
+                }, ensure_ascii=False)
+
+                request_data_full = json.loads(request_string_full, strict=False)
+                embedding_full = embedding_executor.execute(request_data_full, request_id=request_emb_v2) 
+
+                # 리스트를 NumPy 배열로 변환 
+                embedding_metadata = np.array(embedding_metadata, dtype=np.float16)
+                embedding_text = np.array(embedding_text, dtype=np.float16)
+                embedding_full = np.array(embedding_full, dtype=np.float16)
+
+                # 가중치 설정(metadata:text:full = 1:2:2) 후 적용
+                weights = np.array([0.2, 0.4, 0.4], dtype=np.float16)
+                embeddings = [embedding_metadata, embedding_text, embedding_full]
+
+                # 가중치 적용 및 벡터 결합
+                combined_embedding = np.sum([w * e for w, e in zip(weights, embeddings)], axis=0)
+
+                # 최종 임베딩 리스트로 변환 후 저장
+                combined_embedding = combined_embedding.tolist()
+                data["embedding"] = combined_embedding 
+
+                # 전체 텍스트는 검색 결과에 반환하지 않을 것이므로 저장하지 않고, 임베딩에만 사용
                 title_list = [data['title']]
                 date_list = [data['date']]
                 num_speakers_list = [data['num_speakers']]
