@@ -273,7 +273,8 @@ def process_and_embed_transcript(transcript: TranscriptModel):
     # 임베딩 벡터 차원 저장
     dimension_set = set()
 
-    # 분할된 회의 텍스트 임베딩 + 메타데이터 저장
+    # 분할된 회의 텍스트 & 메타데이터 임베딩
+    # 임베딩 결과와 메타데이터 저장
     for data in chunked_data:
 
         if "embedding" in data:
