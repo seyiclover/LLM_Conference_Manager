@@ -282,8 +282,9 @@ def process_and_embed_transcript(transcript: TranscriptModel):
 
         for attempt in range(MAX_RETRIES):
             try:
+                # 회의 메타데이터 + 텍스트 임베딩
                 request_json_string = json.dumps({
-                    "text": data['text'] # 분할된 회의 텍스트
+                    "text": f"회의 제목: {data['title']}, 회의 날짜: {data['date']}, 회의 참석자 수: {data['num_speakers']}, 회의 내용: {data['text']}" 
                 }, ensure_ascii=False)
 
                 request_data = json.loads(request_json_string, strict=False)

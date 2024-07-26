@@ -89,18 +89,18 @@ user_session_states: Dict[int, Dict[str, Any]] = {}
 def get_session_state(user_id: int):
 
     prompt = "너는 사용자가 <회의에 대해 질문할 때>와 사용자가 <회의와 관련 없는 질문할 때> 를 구분하고, 다르게 행동하는 유능한 비서야. \n\
-                        - 답변은 친절하게, 한 줄로 짧게 해. 내용을 모두 전달한 후에는 {추가로 궁금한 점이 있으시면 말씀해 주세요.}라고 말해. \n\
-                        1. 사용자가 회의에 대해 질문하면, 네가 가지고있는 지식은 모두 배제하고, ## 회의 데이터 ## 만을 바탕으로 답변해. ## 회의 데이터 ## 는 사용자가 진행했던 회의 데이터야. 회의 일부는 사용자의 질문과 관련 있는 회의록의 한 부분이야. \n\
-                        2. 사용자가 회의에 대해 질문한 게 아니라면, 반드시 ## 회의 데이터 ## 를 무시하고, 네가 가지고 있는 지식으로 친절하게 답해. \n\
-                        3. 사용자가 기존에 질문한 회의에 대한 추가 질문을 하면, 해당하는 과거 질문의 ## 회의 데이터 ## 를 바탕으로 답변해. \n\
-                            유능한 비서의 답변 ## 예시 ## 처럼 답해. \n\
-                            ## 예시 ## \n\
-                            - 사용자:  서울시 여성 아동 외국인 회의 날짜가 언제였지? \n\
-                            - 비서: 2018년 11월 6일에 서울시 여성 아동 외국인 관련 시설 소관사항에 대한 2018년도 행정사무감사 실시를 선언한 회의가 진행되었습니다. \n\
-                            - 사용자: 회의에서 논의된 예산 관련 사항은 무엇인가요? \n\
-                            - 비서: 해당 회의에서 논의된 예산 관련 사항은 다음과 같습니다.\n\n- 영유아를 양육하는 아버지에게 강의형 또는 체험형의 교육을 진행하는 사업의 예산은 9997만 4000원이며, 이 중 8506만 원을 집행함 \n\
-                            - 사용자: 회의에서 나온 주요 이슈는 무엇인가요? \n\
-                            - 비서: 회의에서 나온 주요 이슈는 다음과 같습니다.\n\n 1. 서울여성공익센터와 서울여성공익센터 아리움의 주요 업무보고\n2. 서울시 육아종합지원센터의 역할과 노력\n3. 영유아를 양육하는 아버지에게 강의형 또는 체험형 교육을 진행하는 사업의 성과와 예산 집행 내역 \n\ "
+                - 답변은 친절하게, 한 줄로 짧게 해. 내용을 모두 전달한 후에는 {추가로 궁금한 점이 있으시면 말씀해 주세요.}라고 말해. \n\
+                1. 사용자가 회의에 대해 질문하면, 네가 가지고있는 지식은 모두 배제하고, ## 회의 데이터 ## 만을 바탕으로 답변해. ## 회의 데이터 ## 는 사용자가 진행했던 회의 데이터야. \n\
+                2. 사용자가 회의에 대해 질문한 게 아니라면, 반드시 ## 회의 데이터 ## 를 무시하고, 네가 가지고 있는 지식으로 친절하게 답해. \n\
+                3. 사용자가 기존에 질문한 회의에 대한 추가 질문을 하면, 해당하는 과거 질문의 ## 회의 데이터 ## 를 바탕으로 답변해. \n\
+            ## 예시 ## 의 비서처럼 답해. \n\
+            ## 예시 ## \n\
+                - 사용자:  서울시 여성 아동 외국인 회의 날짜가 언제였지? \n\
+                - 비서: 2018년 11월 6일에 서울시 여성 아동 외국인 관련 시설 소관사항에 대한 2018년도 행정사무감사 실시를 선언한 회의가 진행되었습니다. \n\
+                - 사용자: 회의에서 논의된 예산 관련 사항은 무엇인가요? \n\
+                - 비서: 해당 회의에서 논의된 예산 관련 사항은 다음과 같습니다.\n\n- 영유아를 양육하는 아버지에게 강의형 또는 체험형의 교육을 진행하는 사업의 예산은 9997만 4000원이며, 이 중 8506만 원을 집행함 \n\
+                - 사용자: 회의에서 나온 주요 이슈는 무엇인가요? \n\
+                - 비서: 회의에서 나온 주요 이슈는 다음과 같습니다.\n\n 1. 서울여성공익센터와 서울여성공익센터 아리움의 주요 업무보고\n2. 서울시 육아종합지원센터의 역할과 노력\n3. 영유아를 양육하는 아버지에게 강의형 또는 체험형 교육을 진행하는 사업의 성과와 예산 집행 내역 \n\ "
 
     # 토큰 수 계산이 다르게 되는 것 같아서 삭제
     # chat_log, last_response, previous_messages 사용하지 않는데 헷갈려서 삭제
@@ -156,9 +156,6 @@ def summarize_and_reset(user_id: int, summarization_executor):
 
     return last_user_message
 
- 
-        
-
 # Connect to Milvus
 connect_to_milvus()
 
@@ -180,34 +177,19 @@ def query_embed(text: str):
     response_data = embedding_executor.execute(request_data, request_id=request_emb)
     return response_data
 
-
-# 비동기 처리된 챗봇 엔드포인트
-@router.post("/chat")
-async def chat(question: Question, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
-
-    user_id = current_user.id
-    session_state = get_session_state(user_id)
-    print(session_state)
-
-    # 사용자 쿼리 벡터화
-    user_question = question.question
-    query_vector = query_embed(user_question)
-
-    # milvus 사용하여 사용자 질문과 가장 유사한 회의 검색
+# 벡터 검색 후 결과 저장
+# reference로 제공할 회의 데이터
+# 유사도 거리는 챗봇에게 제공 안함
+def vector_search(session_state, query_vector):
     search_params = {"metric_type": "IP", "params": {"ef": 64}}
     results = collection.search(
         data=[query_vector],  # 검색할 벡터 데이터
         anns_field="embedding",  # 검색을 수행할 벡터 필드 지정
         param=search_params,
-        limit=3, # 관련도가 가장 높은 3개의 데이터 반환
+        limit=3,  # 관련도가 가장 높은 3개의 데이터 반환
         output_fields=["title", "date", "num_speakers", "text"]
     )
-    
-    session_state['last_user_input'] = user_question
-    session_state['last_user_message'] = {"role": "user", "content": user_question}
 
-    # reference로 제공할 회의 데이터
-    # 유사도 거리는 챗봇에게 제공 안함
     for hit in results[0]:
         title = hit.entity.get("title")
         date = hit.entity.get("date")
@@ -215,9 +197,26 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
         text = hit.entity.get("text")
         session_state['preset_messages'].append({
             "role": "system",
-            "content": f"## 회의 데이터 ## \n- 회의 제목: {title}\n - 회의 날짜: {date}\n - 회의 참석자 수: {num_speakers}\n - 회의 일부: {text}\n"
+            "content": f"## 회의 데이터 ##\n- 회의 제목: {title}\n- 회의 날짜: {date}\n- 회의 참석자 수: {num_speakers}\n- 회의 일부: {text}\n"
         })
+
+
+# 비동기 처리된 챗봇 엔드포인트
+@router.post("/chat")
+async def chat(question: Question, current_user: UserModel = Depends(get_current_user)):
+
+    user_id = current_user.id
+    session_state = get_session_state(user_id)
+
+    # 사용자 쿼리 벡터화
+    user_question = question.question
+    query_vector = query_embed(user_question)
+
+    # 벡터 검색 후 preset_messages에 결과 저장
+    vector_search(session_state, query_vector)
     
+    session_state['last_user_input'] = user_question
+    session_state['last_user_message'] = {"role": "user", "content": user_question}
     session_state['preset_messages'].append(session_state['last_user_message'])
 
     request_data = {
@@ -250,41 +249,22 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
         session_state['last_assistant_message'] = {"role": "assistant", "content": response_text}
         session_state['preset_messages'].append(session_state['last_assistant_message'])
 
-
         log_preset_messages(user_id)
 
 
     except Exception as e:
         response_text = "죄송합니다. 채팅 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
 
-        # 대화 생성 중 max token 제한 초과하는 경우 오류 발생 -> 지금까지의 대화 요약
+        # 대화 생성 중 max token 제한 초과하는 경우 오류 발생하는 경우, 지금까지의 대화 요약
         try: 
             print(f"Error occured during chat for user {user_id}. Starting summarization.")
 
             # 반환된 마지막 사용자 질문 바탕으로 벡터 검색 수행
             last_user_question = summarize_and_reset(user_id, summarization_executor)
             query_vector = query_embed(last_user_question)
+            vector_search(session_state, query_vector)
 
-            search_params = {"metric_type": "IP", "params": {"ef": 64}}
-            results = collection.search(
-                data=[query_vector],  # 검색할 벡터 데이터
-                anns_field="embedding",  # 검색을 수행할 벡터 필드 지정
-                param=search_params,
-                limit=3, # 관련도가 가장 높은 3개의 데이터 반환
-                output_fields=["title", "date", "num_speakers", "text"]
-            )
-
-            for hit in results[0]:
-                title = hit.entity.get("title")
-                date = hit.entity.get("date")
-                num_speakers = hit.entity.get("num_speakers")
-                text = hit.entity.get("text")
-                session_state['preset_messages'].append({
-                    "role": "system",
-                    "content": f"## 회의 데이터 ## \n- 회의 제목: {title}\n - 회의 날짜: {date}\n - 회의 참석자 수: {num_speakers}\n - 회의 일부: {text}\n"
-                })
-
-            # 사용자 질문이 마지막에 와야 하므로 추가
+            # preset_messages에 사용자 질문이 마지막에 와야 하므로 추가
             session_state['preset_messages'].append(session_state['last_user_message'])
 
             # request_data를 다시 생성 또는 업데이트
