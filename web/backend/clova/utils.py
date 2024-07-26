@@ -2,8 +2,6 @@ import os
 import json
 import http.client
 import logging
-import pandas as pd
-import numpy as np
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 from fastapi import HTTPException

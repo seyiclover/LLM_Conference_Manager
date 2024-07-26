@@ -13,8 +13,8 @@ from typing import Any, Dict
 import asyncio
 
 # milvus db
-from pymilvus import connections, Collection
-
+from pymilvus import Collection
+from common.milvus import connect_to_milvus
 
 # .env 파일에서 환경 변수 로드
 load_dotenv(dotenv_path='../.env')
@@ -163,19 +163,6 @@ def summarize_and_reset(user_id: int, summarization_executor):
         
 
     log_preset_messages(user_id)
-    
-# milvus db에 연결
-def connect_to_milvus():
-    try:
-        connections.connect(
-            alias="default",
-            host="localhost",
-            port="19530"  # Milvus의 기본 포트. 환경에 맞게 조정 가능.
-        )
-        logging.info("Successfully connected to Milvus.")
-    except Exception as e:
-        logging.error(f"Error connecting to Milvus: {e}")
-        raise
 
 # Connect to Milvus
 connect_to_milvus()
@@ -225,15 +212,15 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
     session_state['last_user_message'] = {"role": "user", "content": user_question}
 
     # reference로 제공할 회의 데이터
+    # 유사도 거리는 챗봇에게 제공 안함
     for hit in results[0]:
-        distance = hit.distance
         title = hit.entity.get("title")
         date = hit.entity.get("date")
         num_speakers = hit.entity.get("num_speakers")
         text = hit.entity.get("text")
         session_state['preset_messages'].append({
             "role": "system",
-            "content": f"## 회의 데이터 ## \n- 회의 제목: {title}\n - 회의 날짜: {date}\n - 회의 참석자 수: {num_speakers}\n - 회의 일부: {text}\n - 유사도 거리: {distance:.2f}"
+            "content": f"## 회의 데이터 ## \n- 회의 제목: {title}\n - 회의 날짜: {date}\n - 회의 참석자 수: {num_speakers}\n - 회의 일부: {text}\n"
         })
     
     session_state['preset_messages'].append(session_state['last_user_message'])
@@ -278,7 +265,7 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
 
         log_preset_messages(user_id)
 
-        # last_assistant_message 때문에 max token 제한 초과하는 경우, 지금까지의 대화 요약함
+        # 대화 생성 후 max token 제한 초과하는 경우, 지금까지의 대화 요약함
         token_limit = 4096 - request_data["maxTokens"]
         if session_state['total_tokens'] > token_limit:
             print(f"Token limit exceeded for user {user_id}. Starting summarization.")
@@ -299,12 +286,16 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
             response = await asyncio.to_thread(completion_executor.execute, request_data, request_id=request_chat)
             response_text = response['result']['message']['content']
 
-            # last assistant message 추가해야함 ㅜ
+            # session_state['last_response'] = response_text
+            # session_state['last_assistant_message'] = {"role": "assistant", "content": response_text}
+
+            # session_state['preset_messages'].append(session_state['last_assistant_message'])
+            # session_state['chat_log'].append(session_state['last_assistant_message'])
 
     except Exception as e:
         response_text = "죄송합니다. 채팅 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
 
-        # last_assistant_messgae 까지는 괜찮았는데 그 다음 user 질문 때문에 max token 제한 초과하는 경우 오류 발생 -> 요약
+        # 대화 생성 중 max token 제한 초과하는 경우 오류 발생 -> 지금까지의 대화 요약
         try: 
             print(f"Error occured during chat for user {user_id}. Starting summarization.")
             summarize_and_reset(user_id, summarization_executor)
