@@ -286,12 +286,6 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
             response = await asyncio.to_thread(completion_executor.execute, request_data, request_id=request_chat)
             response_text = response['result']['message']['content']
 
-            # session_state['last_response'] = response_text
-            # session_state['last_assistant_message'] = {"role": "assistant", "content": response_text}
-
-            # session_state['preset_messages'].append(session_state['last_assistant_message'])
-            # session_state['chat_log'].append(session_state['last_assistant_message'])
-
     except Exception as e:
         response_text = "죄송합니다. 채팅 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
 
@@ -317,8 +311,6 @@ async def chat(question: Question, db: Session = Depends(get_db), current_user: 
 
             response = await asyncio.to_thread(completion_executor.execute, request_data, request_id=request_chat)
             response_text = response['result']['message']['content']
-
-            # last assistant message 추가해야함 ㅜ
             
         # max token 외 다른 오류 발생시
         except Exception as e:
