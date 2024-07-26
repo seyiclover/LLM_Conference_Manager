@@ -226,12 +226,14 @@ def process_and_embed_transcript(transcript: TranscriptModel):
 
     for data in meeting_data:
         try:
+            # 임베딩 토큰 제한 없어졌으니 나눠지는 문단 길이 늘림 (150~500자)
             request_data = {
                 "alpha": -100,
                 "segCnt": -1,
-                "postProcessMinSize": 500,
+                "postProcessMaxSize": 500,
+                "postProcessMinSize": 150,
                 "text": data.page_content,
-                "postProcess": False
+                "postProcess": True
             }
 
             request_json_string = json.dumps(request_data)
@@ -251,7 +253,6 @@ def process_and_embed_transcript(transcript: TranscriptModel):
                 "date": data.metadata["date"],
                 "num_speakers": data.metadata["num_speakers"],
                 "text": paragraph,
-                "full": data.page_content # 전체 텍스트도 저장
             }
             chunked_data.append(chunked_document)
     
@@ -291,47 +292,22 @@ def process_and_embed_transcript(transcript: TranscriptModel):
 
         for attempt in range(MAX_RETRIES):
             try:
-                # 회의 메타데이터
-                request_string_metadata = json.dumps({
-                    "text": f"회의 제목: {data['title']}, 회의 날짜: {data['date']}, 회의 참석자 수: {data['num_speakers']}" 
+                # 회의 메타데이터 + 텍스트 임베딩
+                request_json_string = json.dumps({
+                    "text": f"회의 제목: {data['title']}, 회의 날짜: {data['date']}, 회의 참석자 수: {data['num_speakers']}, 회의 내용: {data['text']}" 
                 }, ensure_ascii=False)
 
-                request_data_string = json.loads(request_string_metadata, strict=False)
-                embedding_metadata = embedding_executor.execute(request_data_string, request_id=request_emb_v2) 
-
-                # 문단 텍스트
-                request_string_text = json.dumps({
-                    "text": f"{data['text']}" 
-                }, ensure_ascii=False)
-
-                request_data_text = json.loads(request_string_text, strict=False)
-                embedding_text = embedding_executor.execute(request_data_text, request_id=request_emb_v2) 
-
-                # 전체 텍스트
-                request_string_full = json.dumps({
-                    "text": f"{data['full']}" 
-                }, ensure_ascii=False)
-
-                request_data_full = json.loads(request_string_full, strict=False)
-                embedding_full = embedding_executor.execute(request_data_full, request_id=request_emb_v2) 
+                request_data = json.loads(request_json_string, strict=False)
+                embedding = embedding_executor.execute(request_data, request_id=request_emb_v2) 
 
                 # 리스트를 NumPy 배열로 변환 
-                embedding_metadata = np.array(embedding_metadata, dtype=np.float16)
-                embedding_text = np.array(embedding_text, dtype=np.float16)
-                embedding_full = np.array(embedding_full, dtype=np.float16)
+                embedding = np.array(embedding, dtype=np.float16)
 
-                # 가중치 설정(metadata:text:full = 1:2:2) 후 적용
-                weights = np.array([0.2, 0.4, 0.4], dtype=np.float16)
-                embeddings = [embedding_metadata, embedding_text, embedding_full]
+                # 리스트로 변환 후 저장
+                embedding = embedding.tolist()
 
-                # 가중치 적용 및 벡터 결합
-                combined_embedding = np.sum([w * e for w, e in zip(weights, embeddings)], axis=0)
+                data["embedding"] = embedding 
 
-                # 최종 임베딩 리스트로 변환 후 저장
-                combined_embedding = combined_embedding.tolist()
-                data["embedding"] = combined_embedding 
-
-                # 전체 텍스트는 검색 결과에 반환하지 않을 것이므로 저장하지 않고, 임베딩에만 사용
                 title_list = [data['title']]
                 date_list = [data['date']]
                 num_speakers_list = [data['num_speakers']]
