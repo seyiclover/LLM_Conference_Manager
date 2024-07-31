@@ -13,6 +13,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
+# milvus
+from common.milvus import connect_to_milvus, check_and_create_collection
 
 from common.models import init_db
 from backend.auth.routes import router as auth_router
@@ -21,10 +23,12 @@ from backend.upload.routes import router as upload_router
 from backend.clova.routes import router as clova_router
 import uvicorn
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    connect_to_milvus()  # Milvus DB 연결
+    check_and_create_collection("meeting_data")  # 컬렉션 확인 및 생성
+
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -32,8 +36,8 @@ app = FastAPI(lifespan=lifespan)
 # 서버 시작 메시지
 print("welcome server on")
 
-static_dir = "/mnt/a/front/chatbot/build/static"
-index_file_path = "/mnt/a/front/chatbot/build/index.html"
+static_dir = "/Users/jhpark/Documents/study/ai/projects/nexochat/embedding_rag/LLM_Conference_Manager/web/front/build/static"
+index_file_path = "/Users/jhpark/Documents/study/ai/projects/nexochat/embedding_rag/LLM_Conference_Manager/web/front/build/index.html"
 
 # 정적 파일 제공 설정
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
