@@ -14,9 +14,9 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
 # 모델 로드
-model = AutoModelForSpeechSeq2Seq.from_pretrained("NexoChatFuture/whisper-small-youtube-extra", use_auth_token=HUGGINGFACE_TOKEN)
-processor = AutoProcessor.from_pretrained("NexoChatFuture/whisper-small-youtube-extra-processor", use_auth_token=HUGGINGFACE_TOKEN)
-tokenizer = AutoTokenizer.from_pretrained("NexoChatFuture/whisper-small-youtube-extra", use_auth_token=HUGGINGFACE_TOKEN)
+model = AutoModelForSpeechSeq2Seq.from_pretrained("SeyiClover/whisper-small-ko", use_auth_token=HUGGINGFACE_TOKEN)
+processor = AutoProcessor.from_pretrained("SeyiClover/whisper-small-ko-processor", use_auth_token=HUGGINGFACE_TOKEN)
+tokenizer = AutoTokenizer.from_pretrained("SeyiClover/whisper-small-ko", use_auth_token=HUGGINGFACE_TOKEN)
 pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization-3.1', use_auth_token=HUGGINGFACE_TOKEN)
 
 # 모델을 GPU로 이동 (가능한 경우)
