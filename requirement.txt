@@ -76,3 +76,10 @@ uvloop==0.19.0
 watchfiles==0.22.0
 websockets==12.0
 whisper==1.1.10
+
+pyannote-onnx==0.1.0
+onnxruntime==1.18.1
+onnx==1.16.2
+librosa==0.10.2.post1
+scikit-learn==1.5.0
+multiprocess==0.70.15
