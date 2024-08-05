@@ -32,6 +32,7 @@ def check_and_create_collection(collection_name):
     else:
         fields = [
             FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
+            FieldSchema(name="user_id", dtype=DataType.INT64),
             FieldSchema(name="title", dtype=DataType.VARCHAR, max_length=256),
             FieldSchema(name="date", dtype=DataType.VARCHAR, max_length=10),
             FieldSchema(name="num_speakers", dtype=DataType.INT64),

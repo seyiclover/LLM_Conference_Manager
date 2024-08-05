@@ -7,10 +7,10 @@ from fastapi import APIRouter, File, UploadFile, Form, Depends, HTTPException, B
 from fastapi.responses import JSONResponse
 from common.models import get_db, File as FileModel, User as UserModel, Transcript as TranscriptModel
 from backend.auth.routes import get_current_user
-from backend.upload.utils import speaker_diarize
+from backend.upload.utils import DiarizePipeline, return_transcription, to_wav, delete_file, initialize_api
+from concurrent.futures import ThreadPoolExecutor
 
 # milvus
-from pymilvus import utility
 from common.milvus import connect_to_milvus, check_and_create_collection
 from langchain_core.documents.base import Document
 from clova.utils import SegmentationExecutor, EmbeddingExecutor
@@ -63,7 +63,8 @@ class AudioToTextRequest(BaseModel):
 @router.post("/audioToText")
 async def diarize_and_transcribe(
     payload: AudioToTextRequest = Body(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user) # milvus db에 user_id 저장
 ):
     try:
         db_file = db.query(FileModel).filter(FileModel.id == payload.file_id).first()
@@ -73,8 +74,35 @@ async def diarize_and_transcribe(
         file_path = db_file.file_path
         logging.info(f"파일 경로: {file_path}")
 
-        segments = speaker_diarize(file_path, payload.num_speakers)
+        # 업로드된 파일을 wav 형식으로 변환
+        wav_path = to_wav(file_path)
 
+        # 화자분리 파이프라인 실행 (변환된 wav 파일 경로, 참여자 수 제공)
+        pipeline = DiarizePipeline(wav_path, num_speakers=payload.num_speakers)
+        diarize_results = pipeline.run()
+        
+        # huggingface inference api 초기화
+        initialize_api()
+
+        # 병렬로 whisper 전사 진행
+        with ThreadPoolExecutor() as executor:
+            futures = []
+            for info in diarize_results:
+                st = info['start'] # 발화 시작시간
+                ed = info['stop'] # 발화 끝나는 시간
+
+                # return_transcription (발화 시작시간, 끝 시간, wav 경로 -> 전사 텍스트 반환)
+                futures.append(executor.submit(return_transcription, st, ed, wav_path))
+            
+            for future, info in zip(futures, diarize_results):
+                info['transcription'] = future.result()
+
+        # 임시 wav file 삭제
+        delete_file(wav_path)
+
+        # 기존 변수 사용
+        segments = diarize_results
+        
         # segments 형식 검증
         if isinstance(segments, list) and all(isinstance(segment, dict) for segment in segments):
             transcript_text = "\n".join([f"{segment['speaker']}: {segment['transcription']}" for segment in segments])
@@ -98,7 +126,8 @@ async def diarize_and_transcribe(
         logging.info(f"Generated transcript text: {transcript_text}")
 
         # milvus db 에 데이터 저장
-        process_and_embed_transcript(transcript)
+        user_id = current_user.id
+        process_and_embed_transcript(transcript, user_id)
 
         return JSONResponse(content={"message": "Transcript successfully created","meeting_id": transcript.id}, status_code=200)
 
@@ -198,7 +227,7 @@ async def get_meeting_detail(meeting_id: int, db: Session = Depends(get_db)):
 
 # 업로드된 회의 데이터 milvus db에 저장
 # 회의 텍스트는 문단 나눠서 분할 후 임베딩 -> db 저장
-def process_and_embed_transcript(transcript: TranscriptModel):
+def process_and_embed_transcript(transcript: TranscriptModel, user_id):
 
     # 업로드된 회의 데이터
     content = transcript.content
@@ -240,7 +269,6 @@ def process_and_embed_transcript(transcript: TranscriptModel):
             request_data = json.loads(request_json_string, strict=False)
             response_data = segmentation_executor.execute(request_data, request_id=request_seg)
             result_data = [' '.join(segment) for segment in response_data]
-            print(result_data)
 
         except json.JSONDecodeError as e:
             logging.error(f"JSON decoding failed: {e}")
@@ -308,6 +336,7 @@ def process_and_embed_transcript(transcript: TranscriptModel):
 
                 data["embedding"] = embedding 
 
+                user_id_list = [user_id]
                 title_list = [data['title']]
                 date_list = [data['date']]
                 num_speakers_list = [data['num_speakers']]
@@ -315,6 +344,7 @@ def process_and_embed_transcript(transcript: TranscriptModel):
                 embedding_list = [data['embedding']] # 임베딩
 
                 entities = [
+                    user_id_list,
                     title_list,
                     date_list,
                     num_speakers_list,

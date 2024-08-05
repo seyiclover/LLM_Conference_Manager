@@ -179,13 +179,14 @@ def query_embed(text: str):
 # 벡터 검색 후 결과 저장
 # reference로 제공할 회의 데이터
 # 유사도 거리는 챗봇에게 제공 안함
-def vector_search(session_state, query_vector, collection):
+def vector_search(session_state, query_vector, collection, user_id):
     search_params = {"metric_type": "IP", "params": {"ef": 64}}
     results = collection.search(
         data=[query_vector],  # 검색할 벡터 데이터
         anns_field="embedding",  # 검색을 수행할 벡터 필드 지정
         param=search_params,
         limit=3,  # 관련도가 가장 높은 3개의 데이터 반환
+        expr = f"user_id == {user_id}",
         output_fields=["title", "date", "num_speakers", "text"]
     )
 
@@ -212,7 +213,7 @@ async def chat(question: Question, current_user: UserModel = Depends(get_current
     query_vector = query_embed(user_question)
 
     # 벡터 검색 후 preset_messages에 결과 저장
-    vector_search(session_state, query_vector, collection)
+    vector_search(session_state, query_vector, collection, user_id)
     
     session_state['last_user_input'] = user_question
     session_state['last_user_message'] = {"role": "user", "content": user_question}
@@ -261,7 +262,7 @@ async def chat(question: Question, current_user: UserModel = Depends(get_current
             # 반환된 마지막 사용자 질문 바탕으로 벡터 검색 수행
             last_user_question = summarize_and_reset(user_id, summarization_executor)
             query_vector = query_embed(last_user_question)
-            vector_search(session_state, query_vector, collection)
+            vector_search(session_state, query_vector, collection, user_id)
 
             # preset_messages에 사용자 질문이 마지막에 와야 하므로 추가
             session_state['preset_messages'].append(session_state['last_user_message'])

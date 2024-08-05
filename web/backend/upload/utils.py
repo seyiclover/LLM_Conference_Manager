@@ -1,11 +1,20 @@
 import numpy as np
-import io, os
+import os
 import torch
 from dotenv import load_dotenv
-from pyannote.audio import Pipeline
-from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, AutoTokenizer
 import subprocess
 import logging
+
+import onnxruntime as ort
+import torchaudio
+from pyannote_onnx import PyannoteONNX
+import librosa
+from sklearn.cluster import AgglomerativeClustering
+from tqdm import tqdm
+import multiprocessing
+
+import requests, json
+import time
 
 # .env 파일 로드
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
@@ -13,16 +22,9 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 # Hugging Face token
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
-# 모델 로드
-model = AutoModelForSpeechSeq2Seq.from_pretrained("NexoChatFuture/whisper-small-youtube-extra", use_auth_token=HUGGINGFACE_TOKEN)
-processor = AutoProcessor.from_pretrained("NexoChatFuture/whisper-small-youtube-extra-processor", use_auth_token=HUGGINGFACE_TOKEN)
-tokenizer = AutoTokenizer.from_pretrained("NexoChatFuture/whisper-small-youtube-extra", use_auth_token=HUGGINGFACE_TOKEN)
-pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization-3.1', use_auth_token=HUGGINGFACE_TOKEN)
-
-# 모델을 GPU로 이동 (가능한 경우)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model.to(device)
-pipeline.to(device)
+# 모델의 API URL (public 이어야 함)
+API_URL = os.getenv("API_URL")
+headers = {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}
 
 SR = 16000
 CHUNK_DURATION = 30  # seconds
@@ -30,24 +32,120 @@ CHUNK_DURATION = 30  # seconds
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 
-# 사용하지 않는 load_audio 함수 삭제
+def to_wav(path):
+    ''' 오디오/비디오 파일을 wav로 변환 
 
-def return_transcription(audio_data):
-    """오디오 데이터를 전사하여 텍스트 반환"""
+    Parameters
+    ---
+    path: 사용자가 업로드한 오디오/비디오 파일 경로 (ex. audio.mp3)
+
+    Returns
+    ---
+    wav_path: wav로 변환된 파일 경로 (ex. audio_temp.wav)
+    '''
+    base_path = os.path.splitext(path)[0] # 확장자 제외 경로
+    wav_path = base_path + "_temp.wav" # 임시 경로
+
+    cmd = [
+        "ffmpeg", "-y", 
+        "-threads", "0", # 모든 가능한 코어 사용
+        "-i", path,
+        "-f", "wav",
+        "-ac", "1",
+        "-acodec", "pcm_f32le",
+        "-ar", '16000',
+        wav_path # 전처리 파일 경로
+    ]
+
+    subprocess.run(cmd, check=True)
+
+    return wav_path
+
+def delete_file(wav_path):
+    """ 임시 WAV 파일 삭제 """
+    os.remove(wav_path)  
+    print(f"Temporary file {wav_path} has been deleted.")
+
+def initialize_api():
+    """API 초기화를 위한 dummy 요청 함수: 초기 호출/장시간 미사용 후 호출시 에러 발생 방지"""
+    dummy_data = os.path.join(os.path.dirname(__file__), 'dummy_audio.wav')
+
+    max_retries = 5
+    retry_delay = 10
+
+    for attempt in range(max_retries):
+        try:
+            with open(dummy_data, 'rb') as f:
+                data = f.read()
+            response = requests.post(API_URL, headers=headers, data=data)
+            json.loads(response.content)['text']  # 'text' 키가 있는지 확인
+            print("API 초기화 성공")
+            return  # 성공 시 함수 종료
+        except KeyError:
+            if attempt < max_retries - 1:
+                print(f"API 초기화 중... {retry_delay}초 후 재시도 ({attempt + 1}/{max_retries})")
+                time.sleep(retry_delay)
+            else:
+                raise KeyError("API 초기화 실패. 최대 재시도 횟수를 초과했습니다.")
+
+
+def return_transcription(audio_start, audio_end, file_path):
+    """ 오디오 데이터를 전사하여 텍스트 반환 
+    
+    Parameters
+    ---
+    audio_start: 발화 시작시간
+    audio_end: 발화 끝 시간
+    file_path: 오디오 경로
+
+    Returns
+    ---
+    transcriptions: 전사된 텍스트 string
+    """
     try:
-        audio = np.frombuffer(audio_data.read(), dtype=np.float32)
-        total_duration = len(audio) / SR
         transcriptions = []
+        
+        # whisper 가 전사할 수 있는 음성은 최대 30초이므로
+        # CHUNK_DURATION(30초) 단위로 나누어 순차적으로 전사
+        for chunk_start in range(int(audio_start), int(audio_end)+1, CHUNK_DURATION):
 
-        for start in range(0, int(total_duration), CHUNK_DURATION):
-            end = min(start + CHUNK_DURATION, total_duration)
-            chunk = audio[int(start * SR):int(end * SR)]
-            inputs = processor(chunk, return_tensors="pt", sampling_rate=SR)
-            inputs = inputs.to(device)
-            with torch.no_grad():
-                predicted_ids = model.generate(inputs.input_features)
-            transcription = tokenizer.batch_decode(predicted_ids, skip_special_tokens=True)[0]
-            transcriptions.append(transcription)
+            chunk_end = min(chunk_start + CHUNK_DURATION, int(audio_end)+1)
+
+            cmd = [
+                    "ffmpeg", "-nostdin",
+                    "-i", file_path,
+                    "-ss", str(chunk_start),
+                    "-to", str(chunk_end),
+                    "-f", "wav",
+                    "-ac", "1",
+                    "-ar", str(SR),
+                    "pipe:1"
+                ]
+            
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            chunk, _ = process.communicate() # chunk: 30초 단위로 분할된 음성
+
+            max_retries = 5 # API 호출 최대 재시도 횟수
+            retry_delay = 10 # API 호출 실패 시 대기 시간(초)
+
+            # huggingface inference api 사용하여 음성을 텍스트로 변환
+            # data: wav 파일 형식
+            for attempt in range(max_retries):
+                response = requests.post(API_URL, headers=headers, data=chunk)
+
+                try:
+                    transcription = json.loads(response.content)['text']
+                    transcriptions.append(transcription)
+                    print(f'Chunk {chunk_start//CHUNK_DURATION + 1}처리 완료')
+                    break # 텍스트 전사 성공하면 반복 중단
+
+                except Exception as e:
+                    print(f"Chunk {chunk_start//CHUNK_DURATION + 1}처리 중 오류 발생: {response.content}")
+                    if attempt < max_retries - 1:
+                        print(f"Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                    else:
+                        raise # 최대 시도 횟수 초과하면 예외 발생
 
         return ' '.join(transcriptions)
     except Exception as e:
@@ -65,8 +163,7 @@ def merge_speaker_segments(segments):
 
         # 같은 화자인 경우 정보 누적
         if speaker == current_speaker:
-            current_segment['end'] = segment['end']
-            current_segment['audio'] += segment['audio']
+            current_segment['stop'] = segment['stop']
 
             # 전사 텍스트 있는 경우 텍스트도 누적
             if segment['transcription']:
@@ -82,10 +179,9 @@ def merge_speaker_segments(segments):
             current_segment = {
                 'speaker': speaker,
                 'start': segment['start'],
-                'end': segment['end'],
-                'audio': segment['audio'],
-                'transcription': segment['transcription'] # transcription 생성 후에도 화자병합 필요
-            }
+                'stop': segment['stop'],
+                'transcription': segment['transcription'] 
+                }
 
     if current_segment:
         merged_segments.append(current_segment)
@@ -110,77 +206,162 @@ def rename_speakers(segments):
 
     return segments
 
-def speaker_diarize(path, num_speakers):
-    try:
+# 화자분리 pipeline: 
+# 1. segmentation: 음성에서 발화부분 분리 
+# 2. embedding: 분리된 각 발화 구간에서 embedding 추출
+# 3. clustering: 추출된 embedding을 지정된 화자 수(num_speakers)에 맞게 clustering
 
-        # 오디오 파일 불러오고 전처리 
-        base_path = os.path.splitext(path)[0] # 확장자 제외 경로
-        temp_path = base_path + "_temp.wav" # 임시 경로
+class CustomPyannoteONNX(PyannoteONNX):
+    '''Segmetation 모델: Pyannote segmentation 모델 상속받아 수정
 
-        cmd = [
-            "ffmpeg", "-y", 
-            "-threads", "0", # 모든 가능한 코어 사용
-            "-i", path,
-            "-f", "wav",
-            "-ac", "1",
-            "-acodec", "pcm_f32le",
-            "-ar", str(SR),
-            temp_path # temp_path 에 전처리 완료된 임시 파일 저장
-        ]
+    기존 PyannoteONNX 모델 기능 확장 -> 사용할 CPU 코어 수 조정할 수 있게 하여 성능, 리소스 최적화
 
-        subprocess.run(cmd, check=True)
-
-        # 화자분리 모델은 오디오 경로를 받아야 함
-        # 전처리 완료된 오디오 경로 제공
-        diarization = pipeline(temp_path, num_speakers=num_speakers)
-        os.remove(temp_path) # 전처리 완료된 임시 파일은 화자분리 후 삭제 -> 원본 음성 파일/파일명 변화 없음
-        
-        segments = []
-        for turn, _, speaker in diarization.itertracks(yield_label=True):
-            cmd = [
-                "ffmpeg", "-nostdin",
-                "-i", path,
-                "-ss", str(turn.start),
-                "-to", str(turn.end),
-                "-f", "f32le",
-                "-ac", "1",
-                "-acodec", "pcm_f32le",
-                "-ar", str(SR),
-                "pipe:1"
-            ]
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            stdout, stderr = process.communicate()
-
-            if process.returncode != 0:
-                raise Exception(f"Error occurred during ffmpeg process: {stderr.decode()}")
-
-            audio_data = io.BytesIO(stdout)
-            segments.append({
-                'speaker': speaker,
-                'start': turn.start,
-                'end': turn.end,
-                'audio': audio_data.read(),
-                'transcription': '' # transcription 생성 전후 모두 merge_speaker_segments 함수 사용하기 위해 추가
-            })
-
-        # STT 모델이 짧은 음성을 전사하는 경우 오류 자주 발생하므로, 같은 화자의 연속된 음성을 병합한 후 STT 전사 실행
-        segments = merge_speaker_segments(segments)
-
-        for segment in segments:
-            audio_data = io.BytesIO(segment['audio'])
-            segment['transcription'] = return_transcription(audio_data)
-
-        # 'transcription' 결측치 제거
-        # 'transcription' 값이 None, 빈 문자열, 혹은 공백만 있는 문자열인 경우 해당 요소를 제외하고 새로운 리스트 생성
-        segments = [item for item in segments if item.get('transcription', '').strip() != '']
-
-        # transcription 결측치 제거 후 화자 병합 재진행
-        # 가독성 향상 위해 merge_speaker_segments 재실행하여 한 화자의 연속된 발화 합침
-        segments = merge_speaker_segments(segments)
-        segments = rename_speakers(segments)
-
-        return segments  # 올바른 형식으로 반환
+    Attributes
+    ----------
+    session (ort.InferenceSession) : ONNX 모델 추론 세션. 사용자 정의 스레드 설정 적용
     
-    except Exception as e:
-        logging.error(f"오류 발생: {e}")
-        raise
+    Methods
+    -------
+    _create_custom_session(self, inter_threads, intra_threads) : 사용자 정의 추론 세션 생성
+        inter_threads : 연산 간 병렬처리 - 여러 연산을 동시에 실행하는 데 사용되는 스레드 수 
+        intra_threads : 연산 내 병렬처리 - 단일 연산을 수행할 때 사용되는 스레드 수
+        model_path : segmentation model (segmentation-3.0.onnx) 경로
+    '''
+    def __init__(self, show_progress=False, inter_threads=1, intra_threads=1):
+        super().__init__(show_progress=show_progress)
+        self.session = self._create_custom_session(inter_threads, intra_threads)
+
+    def _create_custom_session(self, inter_threads, intra_threads):
+        opts = ort.SessionOptions()
+        opts.inter_op_num_threads = inter_threads
+        opts.intra_op_num_threads = intra_threads
+        model_path = '../models/segmentation-3.0.onnx' # segmentation onnx 모델
+        return ort.InferenceSession(model_path, sess_options=opts)
+
+
+class DiarizePipeline:
+    '''화자분리 Pipeline
+    
+    Segmentation(segmentation-3.0.onnx) > Embedding(voxceleb_resnet34_LM.onnx) > Clustering(AgglomerativeClustering)
+    Pyannote.audio 의 speaker-diariazation pipeline과 모델, 알고리즘은 동일하나 세부적인 코드는 다르므로 성능 차이 있을 수 있음
+
+    Parameters
+    ----------
+    audio_file : 오디오 파일 경로
+    num_speakers : 화자 수
+
+    Returns
+    -------
+    화자분리 및 병합 결과
+        ex. [{'speaker': '참석자 1', 'start': 0.062, 'stop': 20.447, 'transcription': ''},
+             {'speaker': '참석자 2', 'start': 20.565, 'stop': 24.294, 'transcription': ''}, ...]
+    
+    '''
+    
+    def __init__(self, audio_file, num_speakers=3):
+        self.audio_file = audio_file # 오디오 파일 경로
+        self.num_speakers = num_speakers # 화자 수
+        self.sample_rate = 16000 
+        self.cores = multiprocessing.cpu_count() - 1 # 최대 cpu 코어 수-1개 사용
+        self.pyannote_onnx = self.init_pyannote()
+        self.segments = []
+        self.embeddings = []
+        self.labels = []
+
+    # 1. segmentation
+    def init_pyannote(self):
+        return CustomPyannoteONNX(show_progress=True, inter_threads=self.cores, intra_threads=self.cores)
+
+    def load_audio(self):
+        self.wav, _ = librosa.load(self.audio_file, sr=self.sample_rate, mono=True)
+        return self.wav
+
+    def diarization(self):
+        '''
+        seg_info 형태:
+            [{'speaker': 0, 'start': 0.062, 'stop': 20.447},
+            {'speaker': 1, 'start': 20.565, 'stop': 24.294}, ...]
+        '''
+        seg_info = []
+        for track in self.pyannote_onnx.itertracks(self.wav):
+            # 1초 이상 오디오만 처리 
+            # 너무 짧은 음성에서 whisper hallucination, embedding 오류 발생
+            if track['stop'] - track['start'] > 1: 
+                seg_info.append(track)
+
+        for segment in seg_info:
+            speaker_id = str(segment["speaker"]+1) 
+            segment["speaker"] = '참석자 '+ speaker_id
+            segment['transcription'] = ''
+        
+        self.segments = seg_info
+        return seg_info
+
+    # 2. embedding
+    def compute_embeddings(self):
+        '''오디오에서 Mel-scale fbank 특성 추출 > 추출된 특성의 임베딩 반환'''
+        embeddings = []
+        onnx_path = '../models/voxceleb_resnet34_LM.onnx'  # embedding 모델 경로
+        
+        # ONNX 세션 설정
+        so = ort.SessionOptions()
+        so.intra_op_num_threads = self.cores
+        so.inter_op_num_threads = self.cores
+        session = ort.InferenceSession(onnx_path, sess_options=so)
+        
+        # 모든 발화 segment에 대해 반복
+        for segment in tqdm(self.segments):
+            start_time = segment["start"]
+            end_time = segment["stop"]
+            
+            # 오디오에서 fbank 특성 추출
+            feats = self.compute_fbank(self.audio_file, start_time=start_time, end_time=end_time)
+            feats = feats.unsqueeze(0).numpy()  # 배치 차원 추가
+            
+            # 임베딩 계산
+            emb = session.run(output_names=['embs'], input_feed={'feats': feats})[0]
+            embeddings.append(emb)
+        
+        self.embeddings = np.array(embeddings).squeeze()
+        return self.embeddings  # embedding 정보 반환
+
+    # 오디오에서 fbank 특성 추출
+    def compute_fbank(self, wav_path, start_time=None, end_time=None,
+                      num_mel_bins=80, frame_length=25, frame_shift=10, dither=0.0):
+        waveform, sample_rate = torchaudio.load(wav_path)
+        if start_time is not None and end_time is not None:
+            start_sample = int(start_time * sample_rate)
+            end_sample = int(end_time * sample_rate)
+            waveform = waveform[:, start_sample:end_sample]
+        waveform = waveform * (1 << 15)
+        mat = torchaudio.compliance.kaldi.fbank(
+            waveform,
+            num_mel_bins=num_mel_bins,
+            frame_length=frame_length,
+            frame_shift=frame_shift,
+            dither=dither,
+            sample_frequency=sample_rate,
+            window_type='hamming',
+            use_energy=False
+        )
+        mat = mat - torch.mean(mat, dim=0)
+        return mat
+
+    # 3. clustering
+    def cluster_speakers(self):
+        clustering = AgglomerativeClustering(self.num_speakers).fit(self.embeddings)
+        self.labels = clustering.labels_
+        for i, segment in enumerate(self.segments):
+            segment["speaker"] = '참석자 '+ str(self.labels[i] + 1)
+        return self.labels
+
+    def run(self):
+        self.load_audio()
+        self.diarization() # 1. segmentation
+
+        # 발화자 수가 3명 이하인 경우, segmentation 모델만으로 화자분리 가능
+        if self.num_speakers > 3:
+            self.compute_embeddings() # 2. embedding
+            self.cluster_speakers() # 3. clustering
+
+        return merge_speaker_segments(self.segments) # 같은 화자의 연속된 발화 병합
