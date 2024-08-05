@@ -7,7 +7,8 @@ from fastapi import APIRouter, File, UploadFile, Form, Depends, HTTPException, B
 from fastapi.responses import JSONResponse
 from common.models import get_db, File as FileModel, User as UserModel, Transcript as TranscriptModel
 from backend.auth.routes import get_current_user
-from backend.upload.utils import speaker_diarize
+from backend.upload.utils import DiarizePipeline, return_transcription, to_wav, delete_file
+from concurrent.futures import ThreadPoolExecutor
 
 # milvus
 from pymilvus import utility
@@ -73,8 +74,30 @@ async def diarize_and_transcribe(
         file_path = db_file.file_path
         logging.info(f"파일 경로: {file_path}")
 
-        segments = speaker_diarize(file_path, payload.num_speakers)
+        # 업로드된 파일을 wav 형식으로 변환
+        wav_path = to_wav(file_path)
 
+        # 화자분리 파이프라인 실행
+        pipeline = DiarizePipeline(wav_path, num_speakers=payload.num_speakers)
+        diarize_results = pipeline.run()
+        
+        # 병렬로 transcribe 진행
+        with ThreadPoolExecutor() as executor:
+            futures = []
+            for info in diarize_results:
+                st = info['start']
+                ed = info['stop']
+
+                futures.append(executor.submit(return_transcription, st, ed, wav_path))
+            
+            for future, info in zip(futures, diarize_results):
+                info['transcription'] = future.result()
+
+        # 임시 wav file 삭제
+        delete_file(wav_path)
+
+        segments = diarize_results
+        
         # segments 형식 검증
         if isinstance(segments, list) and all(isinstance(segment, dict) for segment in segments):
             transcript_text = "\n".join([f"{segment['speaker']}: {segment['transcription']}" for segment in segments])
