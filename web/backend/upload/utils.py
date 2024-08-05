@@ -136,7 +136,7 @@ def return_transcription(audio_start, audio_end, file_path):
                 try:
                     transcription = json.loads(response.content)['text']
                     transcriptions.append(transcription)
-                    print(f'Chunk {chunk}')
+                    print(f'Chunk {chunk_start//CHUNK_DURATION + 1}처리 완료')
                     break # 텍스트 전사 성공하면 반복 중단
 
                 except Exception as e:
