@@ -77,17 +77,18 @@ async def diarize_and_transcribe(
         # 업로드된 파일을 wav 형식으로 변환
         wav_path = to_wav(file_path)
 
-        # 화자분리 파이프라인 실행
+        # 화자분리 파이프라인 실행 (변환된 wav 파일 경로, 참여자 수 제공)
         pipeline = DiarizePipeline(wav_path, num_speakers=payload.num_speakers)
         diarize_results = pipeline.run()
         
-        # 병렬로 transcribe 진행
+        # 병렬로 whisper 전사 진행
         with ThreadPoolExecutor() as executor:
             futures = []
             for info in diarize_results:
-                st = info['start']
-                ed = info['stop']
+                st = info['start'] # 발화 시작시간
+                ed = info['stop'] # 발화 끝나는 시간
 
+                # return_transcription (발화 시작시간, 끝 시간, wav 경로 -> 전사 텍스트 반환)
                 futures.append(executor.submit(return_transcription, st, ed, wav_path))
             
             for future, info in zip(futures, diarize_results):
@@ -96,6 +97,7 @@ async def diarize_and_transcribe(
         # 임시 wav file 삭제
         delete_file(wav_path)
 
+        # 기존 변수 사용
         segments = diarize_results
         
         # segments 형식 검증
