@@ -29,6 +29,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
 # 모델의 API URL (public 이어야 함)
+# 최종 모델로 변경 필요
 API_URL = "https://api-inference.huggingface.co/models/svenskpotatis/whisper-small-youtube-extra"
 headers = {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}
 
@@ -39,7 +40,16 @@ CHUNK_DURATION = 30  # seconds
 logging.basicConfig(level=logging.INFO)
 
 def to_wav(path):
-    ''' 오디오/비디오 파일을 wav로 변환 '''
+    ''' 오디오/비디오 파일을 wav로 변환 
+
+    Parameters
+    ---
+    path: 사용자가 업로드한 오디오/비디오 파일 경로 (ex. audio.mp3)
+
+    Returns
+    ---
+    wav_path: wav로 변환된 파일 경로 (ex. audio_temp.wav)
+    '''
     base_path = os.path.splitext(path)[0] # 확장자 제외 경로
     wav_path = base_path + "_temp.wav" # 임시 경로
 
@@ -59,15 +69,28 @@ def to_wav(path):
     return wav_path
 
 def delete_file(wav_path):
-    """ 임시 WAV 파일 삭제"""
+    """ 임시 WAV 파일 삭제 """
     os.remove(wav_path)  # 파일 삭제
     print(f"Temporary file {wav_path} has been deleted.")
 
 def return_transcription(audio_start, audio_end, file_path):
-    """오디오 데이터를 전사하여 텍스트 반환"""
+    """ 오디오 데이터를 전사하여 텍스트 반환 
+    
+    Parameters
+    ---
+    audio_start: 발화 시작시간
+    audio_end: 발화 끝 시간
+    file_path: 오디오 경로
+
+    Returns
+    ---
+    transcriptions: 전사된 텍스트 string
+    """
     try:
         transcriptions = []
-
+        
+        # whisper 가 전사할 수 있는 음성은 최대 30초이므로
+        # CHUNK_DURATION(30초) 단위로 나누어 순차적으로 전사
         for chunk_start in range(int(audio_start), int(audio_end)+1, CHUNK_DURATION):
 
             chunk_end = min(chunk_start + CHUNK_DURATION, int(audio_end)+1)
@@ -84,8 +107,10 @@ def return_transcription(audio_start, audio_end, file_path):
                 ]
             
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            chunk, _ = process.communicate()
+            chunk, _ = process.communicate() # chunk: 30초 단위로 분할된 음성
 
+            # huggingface inference api 사용
+            # data: wav 파일 형식
             response = requests.post(API_URL, headers=headers, data=chunk)
 
             try:
@@ -95,6 +120,8 @@ def return_transcription(audio_start, audio_end, file_path):
             except json.JSONDecodeError:
                 print(f"Error decoding JSON for chunk {chunk_start//CHUNK_DURATION + 1}: {response.content}")
             except KeyError:
+                # 첫 api 호출시 에러 - 해결 필요
+                # {"error":"Model svenskpotatis/whisper-small-youtube-extra is currently loading","estimated_time":38.67758560180664}
                 print(f"No 'text' key in response for chunk {chunk_start//CHUNK_DURATION + 1}: {response.content}")
 
         print(transcriptions)
@@ -157,8 +184,27 @@ def rename_speakers(segments):
 
     return segments
 
-# segmentation 모델
+# 화자분리 pipeline: 
+# 1. segmentation: 음성에서 발화부분 분리 
+# 2. embedding: 분리된 각 발화 구간에서 embedding 추출
+# 3. clustering: 추출된 embedding을 지정된 화자 수(num_speakers)에 맞게 clustering
+
 class CustomPyannoteONNX(PyannoteONNX):
+    '''Segmetation 모델: Pyannote segmentation 모델 상속받아 수정
+
+    기존 PyannoteONNX 모델 기능 확장 -> 사용할 CPU 코어 수 조정할 수 있게 하여 성능, 리소스 최적화
+
+    Attributes
+    ----------
+    session (ort.InferenceSession) : ONNX 모델 추론 세션. 사용자 정의 스레드 설정 적용
+    
+    Methods
+    -------
+    _create_custom_session(self, inter_threads, intra_threads) : 사용자 정의 추론 세션 생성
+        inter_threads : 연산 간 병렬처리 - 여러 연산을 동시에 실행하는 데 사용되는 스레드 수 
+        intra_threads : 연산 내 병렬처리 - 단일 연산을 수행할 때 사용되는 스레드 수
+        model_path : segmentation model (segmentation-3.0.onnx) 경로
+    '''
     def __init__(self, show_progress=False, inter_threads=1, intra_threads=1):
         super().__init__(show_progress=show_progress)
         self.session = self._create_custom_session(inter_threads, intra_threads)
@@ -167,16 +213,34 @@ class CustomPyannoteONNX(PyannoteONNX):
         opts = ort.SessionOptions()
         opts.inter_op_num_threads = inter_threads
         opts.intra_op_num_threads = intra_threads
-        model_path = '../models/segmentation-3.0.onnx' # segmentation 모델 onnx
+        model_path = '../models/segmentation-3.0.onnx' # segmentation onnx 모델
         return ort.InferenceSession(model_path, sess_options=opts)
 
-# 화자분리 pipeline: segmentation -> embedding -> clustering
+
 class DiarizePipeline:
+    '''화자분리 Pipeline
+    
+    Segmentation(segmentation-3.0.onnx) > Embedding(voxceleb_resnet34_LM.onnx) > Clustering(AgglomerativeClustering)
+    Pyannote.audio 의 speaker-diariazation pipeline과 모델, 알고리즘은 동일하나 세부적인 코드는 다르므로 성능 차이 있을 수 있음
+
+    Parameters
+    ----------
+    audio_file : 오디오 파일 경로
+    num_speakers : 화자 수
+
+    Returns
+    -------
+    화자분리 및 병합 결과
+        ex. [{'speaker': '참석자 1', 'start': 0.062, 'stop': 20.447, 'transcription': ''},
+             {'speaker': '참석자 2', 'start': 20.565, 'stop': 24.294, 'transcription': ''}, ...]
+    
+    '''
+    
     def __init__(self, audio_file, num_speakers=3):
-        self.audio_file = audio_file
-        self.num_speakers = num_speakers
-        self.sample_rate = 16000  
-        self.cores = multiprocessing.cpu_count() - 1 # 최대 코어 수-1개 사용
+        self.audio_file = audio_file # 오디오 파일 경로
+        self.num_speakers = num_speakers # 화자 수
+        self.sample_rate = 16000 
+        self.cores = multiprocessing.cpu_count() - 1 # 최대 cpu 코어 수-1개 사용
         self.pyannote_onnx = self.init_pyannote()
         self.segments = []
         self.embeddings = []
@@ -193,33 +257,44 @@ class DiarizePipeline:
     def diarization(self):
         seg_info = []
         for track in self.pyannote_onnx.itertracks(self.wav):
-            if track['stop'] - track['start'] > 1: # 1초 이상 오디오만 처리 (whisper hallucination, embedding 오류 방지)
+            # 1초 이상 오디오만 처리 
+            # 너무 짧은 음성에서 whisper hallucination, embedding 오류 발생
+            if track['stop'] - track['start'] > 1: 
                 seg_info.append(track)
         self.segments = seg_info
         return seg_info
 
     # embedding
+    '''
+    오디오에서 Mel-scale fbank 특성 추출 > 추출된 특성의 임베딩 반환
+    '''
     def compute_embeddings(self):
         embeddings = []
-        for segment in tqdm(self.segments):
-            start_time = segment["start"]
-            end_time = segment["stop"]
-            emb = self.embed_main(self.audio_file, start_time, end_time)
-            embeddings.append(emb)
-        self.embeddings = np.array(embeddings).squeeze()
-        return self.embeddings
-
-    def embed_main(self, wav_path, start_time, end_time):
-        onnx_path = '../models/voxceleb_resnet34_LM.onnx'
+        onnx_path = '../models/voxceleb_resnet34_LM.onnx'  # embedding 모델 경로
+        
+        # ONNX 세션 설정
         so = ort.SessionOptions()
         so.intra_op_num_threads = self.cores
         so.inter_op_num_threads = self.cores
         session = ort.InferenceSession(onnx_path, sess_options=so)
-        feats = self.compute_fbank(wav_path, start_time=start_time, end_time=end_time)
-        feats = feats.unsqueeze(0).numpy()  # add batch dimension
-        embeddings = session.run(output_names=['embs'], input_feed={'feats': feats})
-        return embeddings[0]
+        
+        # 모든 발화 segment에 대해 반복
+        for segment in tqdm(self.segments):
+            start_time = segment["start"]
+            end_time = segment["stop"]
+            
+            # 오디오에서 fbank 특성 추출
+            feats = self.compute_fbank(self.audio_file, start_time=start_time, end_time=end_time)
+            feats = feats.unsqueeze(0).numpy()  # 배치 차원 추가
+            
+            # 임베딩 계산
+            emb = session.run(output_names=['embs'], input_feed={'feats': feats})[0]
+            embeddings.append(emb)
+        
+        self.embeddings = np.array(embeddings).squeeze()
+        return self.embeddings  # embedding 정보 반환
 
+    # 오디오에서 fbank 특성 추출
     def compute_fbank(self, wav_path, start_time=None, end_time=None,
                       num_mel_bins=80, frame_length=25, frame_shift=10, dither=0.0):
         waveform, sample_rate = torchaudio.load(wav_path)
@@ -252,7 +327,7 @@ class DiarizePipeline:
 
     def run(self):
         self.load_audio()
-        self.diarization()
-        self.compute_embeddings()
-        self.cluster_speakers()
-        return merge_speaker_segments(self.segments)
+        self.diarization() # segmentation
+        self.compute_embeddings() # embedding
+        self.cluster_speakers() # clustering
+        return merge_speaker_segments(self.segments) # 같은 화자의 연속된 발화 병합
