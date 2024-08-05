@@ -246,7 +246,7 @@ class DiarizePipeline:
         self.embeddings = []
         self.labels = []
 
-    # segmentation
+    # 1. segmentation
     def init_pyannote(self):
         return CustomPyannoteONNX(show_progress=True, inter_threads=self.cores, intra_threads=self.cores)
 
@@ -264,7 +264,7 @@ class DiarizePipeline:
         self.segments = seg_info
         return seg_info
 
-    # embedding
+    # 2. embedding
     '''
     오디오에서 Mel-scale fbank 특성 추출 > 추출된 특성의 임베딩 반환
     '''
@@ -316,7 +316,7 @@ class DiarizePipeline:
         mat = mat - torch.mean(mat, dim=0)
         return mat
 
-    # clustering
+    # 3. clustering
     def cluster_speakers(self):
         clustering = AgglomerativeClustering(self.num_speakers).fit(self.embeddings)
         self.labels = clustering.labels_
