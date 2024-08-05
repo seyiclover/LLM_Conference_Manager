@@ -1,24 +1,17 @@
 import numpy as np
-import io, os
+import os
 import torch
 from dotenv import load_dotenv
-from pyannote.audio import Pipeline
-from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, AutoTokenizer
 import subprocess
 import logging
 
-import numpy as np
 import onnxruntime as ort
-import torch
 import torchaudio
 from pyannote_onnx import PyannoteONNX
-import onnxruntime as ort
 import librosa
 from sklearn.cluster import AgglomerativeClustering
 from tqdm import tqdm
 import multiprocessing
-import subprocess
-from concurrent.futures import ThreadPoolExecutor
 
 import requests, json
 
@@ -29,8 +22,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
 # 모델의 API URL (public 이어야 함)
-# 최종 모델로 변경 필요
-API_URL = "https://api-inference.huggingface.co/models/svenskpotatis/whisper-small-youtube-extra"
+API_URL = os.getenv("API_URL")
 headers = {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}
 
 SR = 16000
@@ -124,7 +116,6 @@ def return_transcription(audio_start, audio_end, file_path):
                 # {"error":"Model svenskpotatis/whisper-small-youtube-extra is currently loading","estimated_time":38.67758560180664}
                 print(f"No 'text' key in response for chunk {chunk_start//CHUNK_DURATION + 1}: {response.content}")
 
-        print(transcriptions)
         return ' '.join(transcriptions)
     except Exception as e:
         logging.error(f"오류 발생: {e}")

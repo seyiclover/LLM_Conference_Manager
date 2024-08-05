@@ -11,7 +11,6 @@ from backend.upload.utils import DiarizePipeline, return_transcription, to_wav, 
 from concurrent.futures import ThreadPoolExecutor
 
 # milvus
-from pymilvus import utility
 from common.milvus import connect_to_milvus, check_and_create_collection
 from langchain_core.documents.base import Document
 from clova.utils import SegmentationExecutor, EmbeddingExecutor
