@@ -7,7 +7,7 @@ from fastapi import APIRouter, File, UploadFile, Form, Depends, HTTPException, B
 from fastapi.responses import JSONResponse
 from common.models import get_db, File as FileModel, User as UserModel, Transcript as TranscriptModel
 from backend.auth.routes import get_current_user
-from backend.upload.utils import DiarizePipeline, return_transcription, to_wav, delete_file
+from backend.upload.utils import DiarizePipeline, return_transcription, to_wav, delete_file, initialize_api
 from concurrent.futures import ThreadPoolExecutor
 
 # milvus
@@ -81,6 +81,9 @@ async def diarize_and_transcribe(
         pipeline = DiarizePipeline(wav_path, num_speakers=payload.num_speakers)
         diarize_results = pipeline.run()
         
+        # huggingface inference api 초기화
+        initialize_api()
+
         # 병렬로 whisper 전사 진행
         with ThreadPoolExecutor() as executor:
             futures = []
@@ -266,7 +269,6 @@ def process_and_embed_transcript(transcript: TranscriptModel, user_id):
             request_data = json.loads(request_json_string, strict=False)
             response_data = segmentation_executor.execute(request_data, request_id=request_seg)
             result_data = [' '.join(segment) for segment in response_data]
-            print(result_data)
 
         except json.JSONDecodeError as e:
             logging.error(f"JSON decoding failed: {e}")

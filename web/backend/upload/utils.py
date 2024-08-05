@@ -14,6 +14,7 @@ from tqdm import tqdm
 import multiprocessing
 
 import requests, json
+import time
 
 # .env 파일 로드
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
@@ -65,6 +66,29 @@ def delete_file(wav_path):
     os.remove(wav_path)  # 파일 삭제
     print(f"Temporary file {wav_path} has been deleted.")
 
+def initialize_api():
+    """API 초기화를 위한 dummy 요청 함수"""
+    dummy_data = os.path.join(os.path.dirname(__file__), 'dummy_audio.wav')
+
+    max_retries = 5
+    retry_delay = 10
+
+    for attempt in range(max_retries):
+        try:
+            with open(dummy_data, 'rb') as f:
+                data = f.read()
+            response = requests.post(API_URL, headers=headers, data=data)
+            json.loads(response.content)['text']  # 'text' 키가 있는지 확인
+            print("API 초기화 성공")
+            return  # 성공 시 함수 종료
+        except KeyError:
+            if attempt < max_retries - 1:
+                print(f"API 초기화 중... {retry_delay}초 후 재시도 ({attempt + 1}/{max_retries})")
+                time.sleep(retry_delay)
+            else:
+                raise KeyError("API 초기화 실패. 최대 재시도 횟수를 초과했습니다.")
+
+
 def return_transcription(audio_start, audio_end, file_path):
     """ 오디오 데이터를 전사하여 텍스트 반환 
     
@@ -101,20 +125,27 @@ def return_transcription(audio_start, audio_end, file_path):
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             chunk, _ = process.communicate() # chunk: 30초 단위로 분할된 음성
 
-            # huggingface inference api 사용
-            # data: wav 파일 형식
-            response = requests.post(API_URL, headers=headers, data=chunk)
+            max_retries = 5 # API 호출 최대 재시도 횟수
+            retry_delay = 10 # API 호출 실패 시 대기 시간(초)
 
-            try:
-                transcription = json.loads(response.content)['text']
-                # print(transcription)
-                transcriptions.append(transcription)
-            except json.JSONDecodeError:
-                print(f"Error decoding JSON for chunk {chunk_start//CHUNK_DURATION + 1}: {response.content}")
-            except KeyError:
-                # 첫 api 호출시 에러 - 해결 필요
-                # {"error":"Model svenskpotatis/whisper-small-youtube-extra is currently loading","estimated_time":38.67758560180664}
-                print(f"No 'text' key in response for chunk {chunk_start//CHUNK_DURATION + 1}: {response.content}")
+            # huggingface inference api 사용하여 음성을 텍스트로 변환
+            # data: wav 파일 형식
+            for attempt in range(max_retries):
+                response = requests.post(API_URL, headers=headers, data=chunk)
+
+                try:
+                    transcription = json.loads(response.content)['text']
+                    transcriptions.append(transcription)
+                    print(f'Chunk {chunk}')
+                    break # 텍스트 전사 성공하면 반복 중단
+
+                except Exception as e:
+                    print(f"Chunk {chunk_start//CHUNK_DURATION + 1}처리 중 오류 발생: {response.content}")
+                    if attempt < max_retries - 1:
+                        print(f"Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                    else:
+                        raise # 최대 시도 횟수 초과하면 예외 발생
 
         return ' '.join(transcriptions)
     except Exception as e:
@@ -246,12 +277,23 @@ class DiarizePipeline:
         return self.wav
 
     def diarization(self):
+        '''
+        seg_info 형태:
+            [{'speaker': 0, 'start': 0.062, 'stop': 20.447},
+            {'speaker': 1, 'start': 20.565, 'stop': 24.294}, ...]
+        '''
         seg_info = []
         for track in self.pyannote_onnx.itertracks(self.wav):
             # 1초 이상 오디오만 처리 
             # 너무 짧은 음성에서 whisper hallucination, embedding 오류 발생
             if track['stop'] - track['start'] > 1: 
                 seg_info.append(track)
+
+        for segment in seg_info:
+            speaker_id = str(segment["speaker"]+1) 
+            segment["speaker"] = '참석자 '+ speaker_id
+            segment['transcription'] = ''
+        
         self.segments = seg_info
         return seg_info
 
@@ -313,12 +355,15 @@ class DiarizePipeline:
         self.labels = clustering.labels_
         for i, segment in enumerate(self.segments):
             segment["speaker"] = '참석자 '+ str(self.labels[i] + 1)
-            segment['transcription'] = ''
         return self.labels
 
     def run(self):
         self.load_audio()
         self.diarization() # segmentation
-        self.compute_embeddings() # embedding
-        self.cluster_speakers() # clustering
+
+        # 발화자 수가 3명 이하인 경우, segmentation 모델만으로 화자분리 가능
+        if self.num_speakers > 3:
+            self.compute_embeddings() # embedding
+            self.cluster_speakers() # clustering
+
         return merge_speaker_segments(self.segments) # 같은 화자의 연속된 발화 병합

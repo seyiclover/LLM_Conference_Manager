@@ -262,7 +262,7 @@ async def chat(question: Question, current_user: UserModel = Depends(get_current
             # 반환된 마지막 사용자 질문 바탕으로 벡터 검색 수행
             last_user_question = summarize_and_reset(user_id, summarization_executor)
             query_vector = query_embed(last_user_question)
-            vector_search(session_state, query_vector, collection)
+            vector_search(session_state, query_vector, collection, user_id)
 
             # preset_messages에 사용자 질문이 마지막에 와야 하므로 추가
             session_state['preset_messages'].append(session_state['last_user_message'])
