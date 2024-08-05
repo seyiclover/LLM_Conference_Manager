@@ -63,7 +63,8 @@ class AudioToTextRequest(BaseModel):
 @router.post("/audioToText")
 async def diarize_and_transcribe(
     payload: AudioToTextRequest = Body(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user) # milvus db에 user_id 저장
 ):
     try:
         db_file = db.query(FileModel).filter(FileModel.id == payload.file_id).first()
@@ -122,7 +123,8 @@ async def diarize_and_transcribe(
         logging.info(f"Generated transcript text: {transcript_text}")
 
         # milvus db 에 데이터 저장
-        process_and_embed_transcript(transcript)
+        user_id = current_user.id
+        process_and_embed_transcript(transcript, user_id)
 
         return JSONResponse(content={"message": "Transcript successfully created","meeting_id": transcript.id}, status_code=200)
 
@@ -222,7 +224,7 @@ async def get_meeting_detail(meeting_id: int, db: Session = Depends(get_db)):
 
 # 업로드된 회의 데이터 milvus db에 저장
 # 회의 텍스트는 문단 나눠서 분할 후 임베딩 -> db 저장
-def process_and_embed_transcript(transcript: TranscriptModel):
+def process_and_embed_transcript(transcript: TranscriptModel, user_id):
 
     # 업로드된 회의 데이터
     content = transcript.content
@@ -332,6 +334,7 @@ def process_and_embed_transcript(transcript: TranscriptModel):
 
                 data["embedding"] = embedding 
 
+                user_id_list = [user_id]
                 title_list = [data['title']]
                 date_list = [data['date']]
                 num_speakers_list = [data['num_speakers']]
@@ -339,6 +342,7 @@ def process_and_embed_transcript(transcript: TranscriptModel):
                 embedding_list = [data['embedding']] # 임베딩
 
                 entities = [
+                    user_id_list,
                     title_list,
                     date_list,
                     num_speakers_list,
