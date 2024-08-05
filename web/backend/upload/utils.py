@@ -63,11 +63,11 @@ def to_wav(path):
 
 def delete_file(wav_path):
     """ 임시 WAV 파일 삭제 """
-    os.remove(wav_path)  # 파일 삭제
+    os.remove(wav_path)  
     print(f"Temporary file {wav_path} has been deleted.")
 
 def initialize_api():
-    """API 초기화를 위한 dummy 요청 함수"""
+    """API 초기화를 위한 dummy 요청 함수: 초기 호출/장시간 미사용 후 호출시 에러 발생 방지"""
     dummy_data = os.path.join(os.path.dirname(__file__), 'dummy_audio.wav')
 
     max_retries = 5
