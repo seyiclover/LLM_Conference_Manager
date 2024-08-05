@@ -298,10 +298,8 @@ class DiarizePipeline:
         return seg_info
 
     # 2. embedding
-    '''
-    오디오에서 Mel-scale fbank 특성 추출 > 추출된 특성의 임베딩 반환
-    '''
     def compute_embeddings(self):
+        '''오디오에서 Mel-scale fbank 특성 추출 > 추출된 특성의 임베딩 반환'''
         embeddings = []
         onnx_path = '../models/voxceleb_resnet34_LM.onnx'  # embedding 모델 경로
         
@@ -359,11 +357,11 @@ class DiarizePipeline:
 
     def run(self):
         self.load_audio()
-        self.diarization() # segmentation
+        self.diarization() # 1. segmentation
 
         # 발화자 수가 3명 이하인 경우, segmentation 모델만으로 화자분리 가능
         if self.num_speakers > 3:
-            self.compute_embeddings() # embedding
-            self.cluster_speakers() # clustering
+            self.compute_embeddings() # 2. embedding
+            self.cluster_speakers() # 3. clustering
 
         return merge_speaker_segments(self.segments) # 같은 화자의 연속된 발화 병합
